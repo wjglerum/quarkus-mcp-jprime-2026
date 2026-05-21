@@ -1,46 +1,71 @@
-# jPrime 2026 Conference Companion (MCP Demo)
+# Practical MCP Security in Action
+### jPrime 2026 / Conference Companion / Demo backend
 
-Two Quarkus apps that back the live demos for the jPrime 2026 talk **Practical MCP Security in Action** (Hall B, day 1, 10:00 to 10:50).
+> "It wasn't the AI. It was me."
+>
+> Three demos, three tiers. All against the same Quarkus MCP server and the same audit log.
 
 ## Layout
 
 | Path | What it is |
 |------|------------|
-| `conference-api/`   | Quarkus REST + Panache + Postgres. Owns the schedule data, attendee agendas, ratings, and audit log. |
-| `conference-mcp/`   | Quarkus MCP server (SSE). Thin protocol adapter that exposes tools to AI clients and propagates the user OAuth token to `conference-api`. |
-| `infra/`            | `compose.yml` for Postgres + Keycloak and the `keycloak-realm.json` export with all clients, roles, and the step-up flow. |
-| `docs/`             | Demo notes and runbook (see `RUNBOOK.md`). |
-| `DEMO_RESET.sh`     | Wipes user-generated rows (bookmarks, ratings, audit, attendees) and re-seeds the demo set for between rehearsal runs. |
+| `conference-api/`   | Quarkus REST + Panache + Postgres. Owns the schedule, attendee agendas, ratings, and the audit log. Serves the live audit dashboard at `/audit-live`. |
+| `conference-mcp/`   | Quarkus MCP server (SSE). Exposes tools to AI clients and propagates the user OAuth token to `conference-api`. |
+| `SPEC.md`           | Original build spec for the demo (canonical reference). |
+| `RUNBOOK.md`        | Stage-side runbook with the three-demo flow and the env vars to set. |
+| `DEMO_RESET.sh`     | Wipes user-generated rows and re-seeds the demo set between rehearsals. |
 
-## Quick start (dev)
+No Docker compose file: every backing service is auto-provisioned by **Quarkus Dev Services**.
+
+## Run
 
 ```bash
-# 1. Boot Keycloak + Postgres
-docker compose -f infra/compose.yml up -d
-
-# 2. In one terminal, run the data API on :8080
+# Terminal 1
 cd conference-api && ./mvnw quarkus:dev
 
-# 3. In a second terminal, run the MCP server on :8082
+# Terminal 2
 cd conference-mcp && ./mvnw quarkus:dev
 ```
 
-In dev mode both apps disable OIDC enforcement so you can poke around with `curl`. Production mode (`%prod`) wires the apps to the Keycloak realm imported by `infra/compose.yml`.
+On first start Dev Services boots:
 
-## Demo flow
+- a **Postgres 16** container for `conference-api` (auto-migrated by Flyway, auto-seeded with the schedule and demo data)
+- a **Keycloak 26** container with the `jprime` realm pre-imported, shared between both apps via `service-name=jprime-keycloak`
 
-See [`RUNBOOK.md`](RUNBOOK.md) for the rehearsal-by-rehearsal flow, the env vars to set, and the recovery steps if something goes sideways on stage.
+Realm exports live at `conference-api/src/main/resources/keycloak-realm.json` and `conference-mcp/src/main/resources/keycloak-realm.json`. Dev Services picks them up by classpath.
 
-## Tech stack
+Dev UI for each app lives at `http://localhost:8080/q/dev/` and `http://localhost:8082/q/dev/`.
 
-- Java 25, Quarkus 3.35
-- Hibernate ORM with Panache, Flyway, Postgres
-- Quarkus OIDC bearer-only on `conference-api`, OIDC + REST client token propagation on `conference-mcp`
-- `quarkiverse-mcp-server-sse` for the MCP protocol
-- Keycloak 26 with the realm export under `infra/keycloak-realm.json`
-- jsoup importer that fetches the live jprime.io agenda and falls back to a baked-in baseline if the page is unreachable
+## Demo dashboard
+
+`http://localhost:8080/audit-live/` shows the second-screen view used in demos 2 and 3. The styling matches the talk deck: dark surface, brand blue for normal events, amber for step-up tools, red for destructive actions, mono font for `audit_event` rows.
+
+Open the page on a secondary monitor and run the demos. New events appear within two seconds of every tool call.
+
+## Demos
+
+See [`RUNBOOK.md`](RUNBOOK.md) for the moment-by-moment script of the three live demos:
+
+1. **Public** — browse the schedule. PKCE + DCR + Authorization Code Flow.
+2. **Personal** — agenda, ratings, conflicts. Token propagation, full audit.
+3. **Sensitive** — speaker-only tools with step-up MFA. Server-driven challenge.
+
+## Brand palette (lifted from the deck)
+
+| Role | Hex | Where it shows up |
+|------|-----|-------------------|
+| Background    | `#0E1116` | Audit dashboard surface |
+| Surface       | `#171B22` | Cards, top bar |
+| Border        | `#2A313C` | Card outlines |
+| Primary text  | `#F5F7FA` | Headings, key values |
+| Muted text    | `#9AA4B2` | Subtitles, field labels |
+| Brand         | `#0088D3` | Normal actions, links, accents |
+| Amber         | `#F2A65A` | Step-up / sensitive actions, identity highlights |
+| Body type     | Calibri / system sans | Headings, prose |
+| Mono type     | Consolas / JetBrains Mono | `audit_event`, identifiers |
 
 ## Conventions
 
 - No em dashes anywhere in code, comments, or docs (Lunatech house style).
-- Tests run against Quarkus Dev Services (Testcontainers under the hood); no external infra needed for `mvn test`.
+- Tests run against Quarkus Dev Services (Testcontainers under the hood); no manual infra needed for `mvn test`.
+- All persistence sequences are named `<entity>_seq` so Hibernate and Flyway agree without extra annotations.

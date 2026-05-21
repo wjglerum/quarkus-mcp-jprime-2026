@@ -2,45 +2,32 @@
 # Wipes user-generated demo data (bookmarks, ratings, audit, attendees) and
 # re-seeds the demo set. Use between rehearsals so each run starts clean.
 #
-# Two strategies, in order of preference:
-#   1. If conference-api is running in dev mode, hit /api/v1/admin/reseed-demo.
-#   2. Otherwise, exec the SQL directly against the Postgres container.
+# Strategy: call the dev-only POST /api/v1/admin/reseed-demo on conference-api.
+# Dev Services owns the database; we never touch it directly.
 
 set -euo pipefail
 
 API_URL="${CONFERENCE_API_URL:-http://localhost:8080}"
-COMPOSE_FILE="${COMPOSE_FILE:-infra/compose.yml}"
-PG_SERVICE="${PG_SERVICE:-postgres}"
-PG_DB="${POSTGRES_DB:-conference}"
-PG_USER="${POSTGRES_USER:-conference}"
 
-reset_via_api() {
-    echo "Trying $API_URL/api/v1/admin/reseed-demo ..."
-    if curl --silent --show-error --fail --max-time 5 -X POST "$API_URL/api/v1/admin/reseed-demo" >/tmp/demo-reset.json; then
-        cat /tmp/demo-reset.json
-        echo
-        return 0
-    fi
-    return 1
-}
-
-reset_via_sql() {
-    echo "Falling back to direct SQL through docker compose ..."
-    docker compose -f "$COMPOSE_FILE" exec -T "$PG_SERVICE" \
-        psql -U "$PG_USER" -d "$PG_DB" <<'SQL'
-TRUNCATE TABLE rating RESTART IDENTITY CASCADE;
-TRUNCATE TABLE bookmark RESTART IDENTITY CASCADE;
-TRUNCATE TABLE audit_event RESTART IDENTITY CASCADE;
-TRUNCATE TABLE attendee RESTART IDENTITY CASCADE;
-SELECT 'wiped' AS status;
-SQL
-    echo "Restart conference-api now so DemoDataSeeder re-runs."
-}
-
-if reset_via_api; then
-    echo "Demo reset complete via API."
+echo "POST $API_URL/api/v1/admin/reseed-demo ..."
+if curl --silent --show-error --fail --max-time 5 -X POST "$API_URL/api/v1/admin/reseed-demo" >/tmp/demo-reset.json; then
+    cat /tmp/demo-reset.json
+    echo
+    echo "Demo reset complete."
     exit 0
 fi
 
-reset_via_sql
-echo "Demo reset complete via SQL. Run 'cd conference-api && ./mvnw quarkus:dev' to re-seed."
+cat <<'MSG'
+Reset endpoint unreachable. Common causes:
+  1. conference-api is not running. Start it with: cd conference-api && ./mvnw quarkus:dev
+  2. CONFERENCE_API_URL points at the wrong host. Default: http://localhost:8080
+  3. The app is running in %prod mode where /admin/* is disabled.
+
+If you need a nuclear reset, stop conference-api and remove the Dev Services
+Postgres container:
+
+  docker ps --filter "label=quarkus-dev-service.postgresql" -q | xargs -r docker rm -f
+
+Then start conference-api again -- Flyway and the seeders will re-create everything.
+MSG
+exit 1

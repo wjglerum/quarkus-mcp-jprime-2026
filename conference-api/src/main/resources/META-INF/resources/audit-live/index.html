@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>jPrime 2026 / Audit Stream</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="audit.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="shield" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/>
+      </svg>
+      <span class="brand-title">Practical MCP Security in Action</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">jPrime 2026</span>
+    </div>
+    <div class="status">
+      <span class="dot live"></span>
+      <span>Live audit stream</span>
+      <span class="brand-sep">/</span>
+      <span id="count">0 events</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>It wasn't the AI.<br><span class="hero-accent">It was me.</span></h1>
+      <p class="hero-sub">
+        Every tool call carries a named identity. Every server-side action lands in
+        <code>audit_event</code>. The AI is the client, not the actor.
+      </p>
+    </section>
+
+    <section class="events" id="events">
+      <div class="empty" id="empty">Waiting for the first event...</div>
+    </section>
+  </main>
+
+  <footer>
+    <span>conference-api / /api/v1/audit/recent</span>
+    <span class="brand-sep">/</span>
+    <span>refresh 2s</span>
+  </footer>
+
+  <template id="event-template">
+    <article class="event">
+      <header class="event-head">
+        <span class="event-type">audit_event</span>
+        <span class="event-time" data-bind="time"></span>
+      </header>
+      <dl class="event-body">
+        <dt>action</dt>
+        <dd class="value action" data-bind="action"></dd>
+        <dt>target</dt>
+        <dd class="value mono" data-bind="target"></dd>
+        <dt>attendee_subject</dt>
+        <dd class="value mono subject" data-bind="subject"></dd>
+        <dt>token_acr</dt>
+        <dd class="value mono" data-bind="acr"></dd>
+        <dt>token_amr</dt>
+        <dd class="value mono" data-bind="amr"></dd>
+        <dt>detail</dt>
+        <dd class="value detail" data-bind="detail"></dd>
+      </dl>
+    </article>
+  </template>
+
+  <script src="audit.js"></script>
+</body>
+</html>
