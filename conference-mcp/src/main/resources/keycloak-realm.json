@@ -75,8 +75,18 @@
       "standardFlowEnabled": true,
       "serviceAccountsEnabled": true,
       "directAccessGrantsEnabled": true,
-      "redirectUris": ["http://localhost:8082/*", "http://localhost:6274/*"],
-      "webOrigins": ["http://localhost:8082", "http://localhost:6274"],
+      "redirectUris": [
+        "http://localhost:8080/*",
+        "http://localhost:8082/*",
+        "http://localhost:8084/*",
+        "http://localhost:6274/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8080",
+        "http://localhost:8082",
+        "http://localhost:8084",
+        "http://localhost:6274"
+      ],
       "attributes": {
         "token.exchange.grant.enabled": "true",
         "standard.token.exchange.enabled": "true",
@@ -231,7 +241,6 @@
     }
   ],
   "attributes": {
-    "acr.loa.map": "{\"0\":\"0\",\"1\":\"1\",\"2\":\"urn:mace:incommon:iap:silver\"}",
-    "frontendUrl": "http://localhost:8081"
+    "acr.loa.map": "{\"urn:mace:incommon:iap:silver\":\"2\",\"silver\":\"2\"}"
   }
 }

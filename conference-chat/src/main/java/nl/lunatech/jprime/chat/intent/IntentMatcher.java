@@ -1,0 +1,146 @@
+package nl.lunatech.jprime.chat.intent;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Tiny rules engine that maps a user prompt to one MCP tool invocation.
+ * Used in scripted mode so the demo never depends on an LLM being reachable.
+ */
+@ApplicationScoped
+public class IntentMatcher {
+
+    private static final Pattern RATING_INLINE = Pattern.compile(
+            "rate\\s+(?:session\\s+)?(?<sid>\\d+)?\\s*(?:.*)?\\b(?<stars>[1-5])\\s*stars?",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern COMMENT_QUOTED = Pattern.compile(
+            "(?:comment|note|saying)\\s+['\"](?<c>[^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SESSION_TITLE_AFTER = Pattern.compile(
+            "(?:bookmark|add|register for|sign me up for|cancel|kill|drop)\\s+(?:the\\s+)?(?<t>[A-Za-z][^,?!]+?)(?:\\s+talk|\\s+session|\\s+keynote|\\b)",
+            Pattern.CASE_INSENSITIVE);
+
+    public Intent match(String raw) {
+        if (raw == null) return Intent.none();
+        String prompt = raw.trim();
+        String lower = prompt.toLowerCase(Locale.ENGLISH);
+
+        if (lower.matches(".*\\b(now|right now|currently|on now)\\b.*")
+                && lower.matches(".*\\b(what|which|happening|on)\\b.*")) {
+            return new Intent("whats_on_now", Map.of(), "Looking up sessions running right now.");
+        }
+        if (lower.matches(".*\\b(next|coming up|after)\\b.*")
+                && !lower.contains("cancel")) {
+            return new Intent("whats_next", Map.of("limit", 3), "Pulling up the next three sessions.");
+        }
+        if (lower.contains("my agenda") || lower.contains("my schedule")
+                || (lower.contains("agenda") && lower.contains("me"))) {
+            return new Intent("my_agenda", Map.of(), "Fetching your saved agenda.");
+        }
+        if (lower.contains("conflict") || lower.contains("overlap")) {
+            return new Intent("my_conflicts", Map.of(), "Checking for overlapping sessions on your agenda.");
+        }
+        if (lower.contains("my rating") || lower.contains("ratings i") || lower.contains("rated")) {
+            return new Intent("my_ratings", Map.of(), "Listing the ratings you have submitted.");
+        }
+        if (lower.contains("feedback") && (lower.contains("my") || lower.contains("speaker"))) {
+            return new Intent("my_session_feedback", Map.of(),
+                    "Fetching the ratings attendees have left on your sessions.");
+        }
+        if (lower.contains("who") && lower.contains("attend")) {
+            String title = extractGroup(SESSION_TITLE_AFTER, prompt, "t");
+            return new Intent("view_session_attendees",
+                    title == null ? Map.of() : Map.of("session_query", title),
+                    "Asking for the attendee list. This is sensitive and needs step-up auth.");
+        }
+        if (lower.startsWith("cancel ") || lower.contains("cancel my ") || lower.contains("kill my session")) {
+            String title = extractGroup(SESSION_TITLE_AFTER, prompt, "t");
+            String reason = extractGroup(Pattern.compile(
+                    "(?:because|reason\\s+is|the reason is|since)\\s+(?<r>.+)$",
+                    Pattern.CASE_INSENSITIVE), prompt, "r");
+            return new Intent("cancel_my_session",
+                    Map.of(
+                            "session_query", title == null ? "" : title,
+                            "reason", reason == null ? "demo cancellation" : reason),
+                    "Cancelling. This is destructive and needs step-up auth.");
+        }
+        Matcher rate = RATING_INLINE.matcher(prompt);
+        if (rate.find() || lower.contains("rate")) {
+            int stars = 5;
+            if (rate.matches() || rate.find(0)) {
+                try { stars = Integer.parseInt(rate.group("stars")); }
+                catch (Exception ignore) { /* default */ }
+            }
+            String comment = extractGroup(COMMENT_QUOTED, prompt, "c");
+            String title = extractGroup(SESSION_TITLE_AFTER, prompt, "t");
+            return new Intent("rate_session",
+                    Map.of(
+                            "session_query", title == null ? "current" : title,
+                            "stars", stars,
+                            "comment", comment == null ? "" : comment),
+                    "Rating with " + stars + " stars" + (comment == null ? "" : " and a comment") + ".");
+        }
+        if (lower.startsWith("bookmark") || lower.startsWith("add ") || lower.contains("sign me up")
+                || lower.contains("register for")) {
+            String title = extractGroup(SESSION_TITLE_AFTER, prompt, "t");
+            return new Intent("bookmark_session",
+                    title == null ? Map.of() : Map.of("session_query", title),
+                    "Bookmarking session.");
+        }
+        if (lower.contains("speaker") || lower.startsWith("find ") || lower.contains("who is")) {
+            String name = lower.replaceAll(".*?(?:speaker|find|who is)\\s+", "").trim();
+            if (!name.isBlank()) {
+                return new Intent("find_speaker", Map.of("name", name),
+                        "Looking up speaker by name.");
+            }
+        }
+        if (lower.contains("session") || lower.contains("talk") || lower.contains("schedule")) {
+            return new Intent("list_sessions", Map.of("query", prompt),
+                    "Searching the schedule.");
+        }
+
+        return Intent.none();
+    }
+
+    public static List<QuickPrompt> quickPrompts() {
+        return List.of(
+                new QuickPrompt("What's happening right now?",     "whats_on_now",         "public"),
+                new QuickPrompt("What's coming up next?",          "whats_next",           "public"),
+                new QuickPrompt("Find the Practical MCP talk",     "list_sessions",        "public"),
+                new QuickPrompt("Bookmark the JSpecify talk for me",   "bookmark_session", "attendee"),
+                new QuickPrompt("Show me my agenda",               "my_agenda",            "attendee"),
+                new QuickPrompt("Do I have any conflicts?",        "my_conflicts",         "attendee"),
+                new QuickPrompt("Rate the MCP Security talk 5 stars with comment 'great use of caffeine'",
+                        "rate_session", "attendee"),
+                new QuickPrompt("Show feedback on my sessions",    "my_session_feedback",  "speaker"),
+                new QuickPrompt("Who signed up for my Concurrency Crossroads deep dive?",
+                        "view_session_attendees", "step-up"),
+                new QuickPrompt("Cancel my deep dive, reason is I want to go home early",
+                        "cancel_my_session", "step-up")
+        );
+    }
+
+    private static String extractGroup(Pattern p, String input, String group) {
+        Matcher m = p.matcher(input);
+        if (!m.find()) return null;
+        try {
+            return m.group(group);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public record Intent(String tool, Map<String, Object> args, String note) {
+        public static Intent none() {
+            return new Intent(null, Map.of(),
+                    "I'm not sure which conference tool to use. Try one of the quick prompts.");
+        }
+        public boolean matched() { return tool != null; }
+    }
+
+    public record QuickPrompt(String label, String suggestedTool, String tier) {}
+}

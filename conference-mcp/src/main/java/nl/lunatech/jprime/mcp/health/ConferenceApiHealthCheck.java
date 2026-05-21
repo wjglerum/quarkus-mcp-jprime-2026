@@ -1,0 +1,38 @@
+package nl.lunatech.jprime.mcp.health;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import nl.lunatech.jprime.mcp.api.PublicConferenceApi;
+import org.eclipse.microprofile.health.HealthCheck;
+import org.eclipse.microprofile.health.HealthCheckResponse;
+import org.eclipse.microprofile.health.Readiness;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+
+/**
+ * Readiness probe: the MCP server is only useful if it can reach the
+ * conference-api. Liveness is handled by the default smallrye-health probe.
+ */
+@Readiness
+@ApplicationScoped
+public class ConferenceApiHealthCheck implements HealthCheck {
+
+    @Inject
+    @RestClient
+    PublicConferenceApi api;
+
+    @Override
+    public HealthCheckResponse call() {
+        try {
+            int n = api.listSessions(null, null, null, null, null).size();
+            return HealthCheckResponse.named("conference-api")
+                    .up()
+                    .withData("sessions", n)
+                    .build();
+        } catch (Exception e) {
+            return HealthCheckResponse.named("conference-api")
+                    .down()
+                    .withData("error", e.getClass().getSimpleName() + ": " + e.getMessage())
+                    .build();
+        }
+    }
+}

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>jPrime 2026 / Conference Companion</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/chat.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="shield" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/>
+      </svg>
+      <span class="brand-title">Practical MCP Security in Action</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">jPrime 2026 Conference Companion</span>
+    </div>
+    <div class="status" id="status">
+      <span class="dot live"></span>
+      <span class="who" id="who">loading...</span>
+      <span class="brand-sep">/</span>
+      <span class="mode-pill" id="mode-pill">scripted</span>
+    </div>
+  </header>
+
+  <main>
+    <aside class="sidebar">
+      <h2 class="sidebar-title">Quick prompts</h2>
+      <div class="quick-prompts" id="quick-prompts"></div>
+
+      <h2 class="sidebar-title">Mode</h2>
+      <label class="mode-toggle">
+        <input type="checkbox" id="mode-llm">
+        <span class="mode-track"><span class="mode-knob"></span></span>
+        <span class="mode-label">Use Claude as the assistant</span>
+      </label>
+      <p class="mode-help" id="mode-help">Default. Deterministic intent matcher.</p>
+
+      <h2 class="sidebar-title">Identity</h2>
+      <dl class="identity" id="identity"></dl>
+
+      <h2 class="sidebar-title">Companion screens</h2>
+      <ul class="links">
+        <li><a href="http://localhost:8080/audit-live/" target="_blank">Audit dashboard</a></li>
+        <li><a href="http://localhost:8080/q/swagger-ui/" target="_blank">conference-api swagger</a></li>
+        <li><a href="http://localhost:8082/q/dev/" target="_blank">conference-mcp Dev UI</a></li>
+      </ul>
+    </aside>
+
+    <section class="chat">
+      <div class="transcript" id="transcript">
+        <div class="bubble assistant intro">
+          <div class="bubble-meta"><span class="role">assistant</span></div>
+          <p>Hi. I'm the jPrime 2026 conference companion. Ask me about the schedule, your agenda, or any of your sessions if you are a speaker.</p>
+          <p class="muted">Every tool I call lands in the audit log under <strong id="intro-name">your</strong> identity. Have a look at the audit dashboard on the second screen.</p>
+        </div>
+      </div>
+
+      <form class="composer" id="composer">
+        <input type="text" id="prompt" name="prompt" autocomplete="off"
+               placeholder="Try: What's on now? / Bookmark the JSpecify talk / Rate this 5 stars">
+        <button type="submit" class="send" aria-label="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <template id="user-bubble">
+    <div class="bubble user">
+      <div class="bubble-meta"><span class="role" data-bind="who"></span><span class="time" data-bind="time"></span></div>
+      <p data-bind="text"></p>
+    </div>
+  </template>
+
+  <template id="assistant-bubble">
+    <div class="bubble assistant">
+      <div class="bubble-meta"><span class="role">assistant</span><span class="time" data-bind="time"></span></div>
+      <p class="note" data-bind="note"></p>
+      <article class="tool-card" data-bind-card>
+        <header class="tool-head">
+          <span class="tool-type" data-bind="toolType">mcp.tool_call</span>
+          <span class="tool-name" data-bind="toolName"></span>
+          <span class="tool-tier" data-bind="toolTier"></span>
+        </header>
+        <pre class="tool-args" data-bind="toolArgs"></pre>
+        <header class="tool-head subdued">
+          <span class="tool-type">mcp.tool_result</span>
+        </header>
+        <pre class="tool-result" data-bind="toolResult"></pre>
+      </article>
+      <div class="tool-error" data-bind-error data-bind="errorText"></div>
+      <div class="tool-stepup" data-bind-stepup>
+        <strong>Step-up required.</strong>
+        <span>The server replied <code>insufficient_user_authentication</code>. Open the Keycloak login window, enter your TOTP code, then retry.</span>
+      </div>
+    </div>
+  </template>
+
+  <script src="/chat.js"></script>
+</body>
+</html>
