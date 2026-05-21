@@ -1,0 +1,237 @@
+{
+  "realm": "jprime",
+  "enabled": true,
+  "displayName": "jPrime 2026",
+  "accessTokenLifespan": 600,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "attendee", "description": "Conference attendee" },
+      { "name": "speaker",  "description": "Conference speaker" }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "attendee",
+      "description": "Allow tools acting on behalf of an attendee",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Manage your jPrime agenda and ratings"
+      },
+      "protocolMappers": [
+        {
+          "name": "attendee role",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "speaker",
+      "description": "Allow tools that act on speaker-only data",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Access your speaker dashboard"
+      }
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "conference-api",
+      "name": "Conference API (resource server)",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "conference-api-secret",
+      "attributes": {
+        "use.refresh.tokens": "false"
+      },
+      "defaultClientScopes": ["profile", "email"],
+      "optionalClientScopes": ["attendee", "speaker"]
+    },
+    {
+      "clientId": "conference-mcp",
+      "name": "Conference MCP Server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "conference-mcp-secret",
+      "standardFlowEnabled": true,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8082/*", "http://localhost:6274/*"],
+      "webOrigins": ["http://localhost:8082", "http://localhost:6274"],
+      "attributes": {
+        "token.exchange.grant.enabled": "true",
+        "standard.token.exchange.enabled": "true",
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": ["profile", "email"],
+      "optionalClientScopes": ["attendee", "speaker"]
+    },
+    {
+      "clientId": "mcp-clients",
+      "name": "MCP Clients (Dynamic Client Registration parent)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:6274/*", "http://localhost:*/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": ["profile", "email"],
+      "optionalClientScopes": ["attendee", "speaker"]
+    }
+  ],
+  "users": [
+    {
+      "username": "attendee1",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "attendee1@example.com",
+      "firstName": "Attendee",
+      "lastName": "One",
+      "realmRoles": ["attendee"],
+      "credentials": [
+        { "type": "password", "value": "attendee1", "temporary": false }
+      ]
+    },
+    {
+      "username": "willem.jan",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "willem.jan@lunatech.nl",
+      "firstName": "Willem Jan",
+      "lastName": "Glerum",
+      "realmRoles": ["attendee", "speaker"],
+      "credentials": [
+        { "type": "password", "value": "willem.jan", "temporary": false }
+      ],
+      "requiredActions": ["CONFIGURE_TOTP"]
+    },
+    {
+      "username": "admin-demo",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@example.com",
+      "firstName": "Demo",
+      "lastName": "Admin",
+      "realmRoles": ["attendee", "speaker"],
+      "credentials": [
+        { "type": "password", "value": "admin", "temporary": false }
+      ]
+    }
+  ],
+  "browserFlow": "browser",
+  "authenticationFlows": [
+    {
+      "alias": "browser-step-up",
+      "description": "Browser flow that requests TOTP when acr=2 is requested.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "requirement": "ALTERNATIVE",
+          "priority": 25,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "step-up-forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "autheticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "step-up-forms",
+      "description": "Username + password, then conditional OTP based on acr.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "step-up-otp-conditional",
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "step-up-otp-conditional",
+      "description": "Only requires OTP when the request asks for acr=2.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "step-up-acr-2"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "step-up-acr-2",
+      "config": {
+        "level": "2",
+        "max_age": "300"
+      }
+    }
+  ],
+  "attributes": {
+    "acr.loa.map": "{\"0\":\"0\",\"1\":\"1\",\"2\":\"urn:mace:incommon:iap:silver\"}",
+    "frontendUrl": "http://localhost:8081"
+  }
+}

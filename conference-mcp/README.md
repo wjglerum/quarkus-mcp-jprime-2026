@@ -1,61 +1,60 @@
 # conference-mcp
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Quarkus MCP server that exposes the jPrime 2026 schedule, agenda, and speaker tools to AI clients. Speaks the Model Context Protocol over SSE and propagates the user OAuth token to `conference-api` for every authenticated tool call.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Run
 
-## Running the application in dev mode
-
-You can run your application in dev mode that enables live coding using:
-
-```shell script
+```bash
 ./mvnw quarkus:dev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+Listens on `:8082`. MCP endpoint: `http://localhost:8082/mcp/sse`.
 
-## Packaging and running the application
+The `conference-api` URL is read from `CONFERENCE_API_URL` (default `http://localhost:8080`). In dev mode OIDC is disabled so the inspector can connect without DCR.
 
-The application can be packaged using:
+## Tools
 
-```shell script
-./mvnw package
+### Public (any registered MCP client)
+- `list_sessions` -- filter by day/track/query/speaker_name.
+- `get_session`
+- `whats_on_now` -- uses the `DEMO_NOW` env var when set so rehearsals are deterministic.
+- `whats_next`
+- `find_speaker`
+
+### Attendee (requires role `attendee`)
+- `bookmark_session`, `unbookmark_session`, `my_agenda`, `my_conflicts`
+- `rate_session` -- the server-side check rejects ratings on sessions that have not started yet.
+- `my_ratings`
+
+### Speaker (requires role `speaker`)
+- `my_session_feedback`
+
+### Speaker, step-up required (acr=`urn:mace:incommon:iap:silver` or amr=`mfa`/`otp`)
+- `view_session_attendees` -- emits `insufficient_user_authentication` if the token is too weak.
+- `cancel_my_session` -- reversible toggle. Audited.
+
+Tool descriptions are written for an LLM. When you add a tool, optimize the wording so the model can pick it confidently.
+
+## Auth model
+
+1. The MCP client registers with Keycloak via Dynamic Client Registration.
+2. The user logs in via the authorization code flow with PKCE.
+3. The MCP client sends the access token in `Authorization: Bearer` on the SSE channel.
+4. `quarkus-oidc` validates the token and exposes its claims to tool methods.
+5. For tools that hit `conference-api`, the `MeConferenceApi` REST client is annotated with `@AccessToken`, so `quarkus-rest-client-oidc-token-propagation` attaches the same bearer token outbound. Defense in depth: `conference-api` re-checks the token against its own audience and re-evaluates roles + acr.
+
+The `McpSecurity` bean centralises `requireRole(...)` and `requireStepUp()`. Step-up rejection raises `ToolCallException("insufficient_user_authentication: ...")` so the MCP client can show a structured error.
+
+## Testing
+
+```bash
+./mvnw test
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+`ToolsSmokeTest` verifies all four tool beans are wired by CDI. Heavier end-to-end tests are out of scope here; the data API has its own integration coverage.
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
+## Related guides
 
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
-```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using:
-
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/conference-mcp-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Related Guides
-
-- Hibernate Validator ([guide](https://quarkus.io/guides/validation)): Bean validation using Hibernate Validator and Jakarta Validation annotations
-- OpenID Connect ([guide](https://quarkus.io/guides/security-openid-connect)): Secure applications with OpenID Connect and OAuth 2.0 using bearer tokens and authorization code flow
-- REST Client - OpenID Connect Token Propagation ([guide](https://quarkus.io/guides/security-openid-connect-client)): Use REST Client to propagate the incoming Bearer access token or token acquired from Authorization Code Flow as HTTP Authorization Bearer token
-- MCP Server - HTTP/SSE ([guide](https://docs.quarkiverse.io/quarkus-mcp-server/dev/index.html)): This extension enables developers to implement the MCP server features easily.
+- [Quarkiverse MCP Server](https://docs.quarkiverse.io/quarkus-mcp-server/dev/)
+- [OpenID Connect](https://quarkus.io/guides/security-openid-connect)
+- [REST Client OIDC Token Propagation](https://quarkus.io/guides/security-openid-connect-client-reference)
