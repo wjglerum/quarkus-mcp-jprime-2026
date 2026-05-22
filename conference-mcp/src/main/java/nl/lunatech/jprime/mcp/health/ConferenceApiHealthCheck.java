@@ -8,10 +8,6 @@ import org.eclipse.microprofile.health.HealthCheckResponse;
 import org.eclipse.microprofile.health.Readiness;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
-/**
- * Readiness probe: the MCP server is only useful if it can reach the
- * conference-api. Liveness is handled by the default smallrye-health probe.
- */
 @Readiness
 @ApplicationScoped
 public class ConferenceApiHealthCheck implements HealthCheck {
@@ -23,7 +19,7 @@ public class ConferenceApiHealthCheck implements HealthCheck {
     @Override
     public HealthCheckResponse call() {
         try {
-            int n = api.listSessions(null, null, null, null, null).size();
+            int n = api.listSessions(null, null).size();
             return HealthCheckResponse.named("conference-api")
                     .up()
                     .withData("sessions", n)

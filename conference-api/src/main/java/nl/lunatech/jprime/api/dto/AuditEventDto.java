@@ -1,0 +1,22 @@
+package nl.lunatech.jprime.api.dto;
+
+import nl.lunatech.jprime.api.domain.AuditEvent;
+
+import java.time.OffsetDateTime;
+
+public record AuditEventDto(
+        Long id,
+        String attendeeSubject,
+        String action,
+        String target,
+        String tokenAcr,
+        String tokenAmr,
+        OffsetDateTime createdAt,
+        String detail
+) {
+    public static AuditEventDto of(AuditEvent e) {
+        return new AuditEventDto(
+                e.id, e.attendeeSubject, e.action, e.target,
+                e.tokenAcr, e.tokenAmr, e.createdAt, e.detail);
+    }
+}

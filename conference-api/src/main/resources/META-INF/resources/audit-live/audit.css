@@ -41,6 +41,15 @@ body {
     flex-direction: column;
 }
 
+body::before {
+    content: '';
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 8px;
+    background: var(--brand);
+    z-index: 100;
+}
+
 .topbar {
     display: flex;
     align-items: center;

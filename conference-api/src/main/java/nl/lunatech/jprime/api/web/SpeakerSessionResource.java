@@ -12,14 +12,13 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import nl.lunatech.jprime.api.audit.AuditService;
 import nl.lunatech.jprime.api.domain.Attendee;
 import nl.lunatech.jprime.api.domain.Bookmark;
 import nl.lunatech.jprime.api.domain.Session;
-import nl.lunatech.jprime.api.web.Dtos.AttendeeBookmarkDto;
-import nl.lunatech.jprime.api.web.Dtos.CancelSessionRequest;
-import nl.lunatech.jprime.api.web.Dtos.SessionDto;
+import nl.lunatech.jprime.api.dto.AttendeeBookmarkDto;
+import nl.lunatech.jprime.api.dto.CancelSessionRequest;
+import nl.lunatech.jprime.api.dto.SessionDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
@@ -50,7 +49,6 @@ public class SpeakerSessionResource {
                     return new AttendeeBookmarkDto(
                             bm.attendee.id,
                             bm.attendee.displayName,
-                            bm.attendee.email,
                             bm.createdAt);
                 })
                 .toList();
@@ -82,7 +80,7 @@ public class SpeakerSessionResource {
         Session s = Session.findById(id);
         if (s == null) throw new NotFoundException("session " + id);
         Attendee me = attendees.currentAttendee();
-        if (me.speaker == null || s.speakers.stream().noneMatch(sp -> sp.id.equals(me.speaker.id))) {
+        if (me.speaker == null || s.speaker == null || !s.speaker.id.equals(me.speaker.id)) {
             audit.record("CANCEL_SESSION_ATTEMPTED", "session:" + id, "not a speaker on session");
             throw new ForbiddenException("you are not a speaker on this session");
         }

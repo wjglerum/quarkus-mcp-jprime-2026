@@ -1,205 +1,169 @@
 package nl.lunatech.jprime.chat.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.service.tool.AiServiceTool;
+import dev.langchain4j.service.tool.ToolExecutor;
+import dev.langchain4j.service.tool.ToolProvider;
+import dev.langchain4j.service.tool.ToolProviderResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response;
-import nl.lunatech.jprime.chat.client.Dtos.AttendeeBookmarkDto;
-import nl.lunatech.jprime.chat.client.Dtos.BookmarkDto;
-import nl.lunatech.jprime.chat.client.Dtos.CancelSessionRequest;
-import nl.lunatech.jprime.chat.client.Dtos.CreateBookmarkRequest;
-import nl.lunatech.jprime.chat.client.Dtos.CreateRatingRequest;
-import nl.lunatech.jprime.chat.client.Dtos.RatingDto;
-import nl.lunatech.jprime.chat.client.Dtos.SessionDto;
-import nl.lunatech.jprime.chat.client.Dtos.SessionFeedbackDto;
-import nl.lunatech.jprime.chat.client.Dtos.SpeakerDto;
-import nl.lunatech.jprime.chat.client.MeConferenceApi;
-import nl.lunatech.jprime.chat.client.PublicConferenceApi;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.jboss.logging.Logger;
 
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 
-/**
- * Executes the MCP-shaped tool call described by an {@code Intent} against
- * conference-api. The chat UI renders the outbound and inbound payloads as if
- * they were MCP wire messages -- because they map 1:1 to the tools exposed by
- * conference-mcp.
- */
 @ApplicationScoped
 public class ToolDispatcher {
 
-    @Inject
-    @RestClient
-    PublicConferenceApi publicApi;
+    private static final Logger LOG = Logger.getLogger(ToolDispatcher.class);
+
+    private static final Set<String> TOOLS_NEEDING_SESSION_ID = Set.of(
+            "bookmark_session", "unbookmark_session", "rate_session",
+            "get_session", "view_session_attendees", "cancel_my_session");
 
     @Inject
-    @RestClient
-    MeConferenceApi me;
+    ToolProvider mcpToolProvider;
 
-    @ConfigProperty(name = "demo.now")
-    Optional<String> demoNow;
+    private final ObjectMapper mapper = new ObjectMapper();
 
     public ToolResult invoke(String tool, Map<String, Object> args) {
+        Map<String, Object> safeArgs = args == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(args);
+
         try {
-            return switch (tool) {
-                case "list_sessions" -> {
-                    String q = asString(args.get("query"));
-                    Integer day = asInt(args.get("day"));
-                    String track = asString(args.get("track"));
-                    yield ToolResult.ok(tool, args, publicApi.listSessions(day, track, null, null, q));
+            ToolProviderResult tools = mcpToolProvider.provideTools(null);
+
+            if (TOOLS_NEEDING_SESSION_ID.contains(tool) && !hasNumeric(safeArgs, "session_id")) {
+                Long resolved = resolveSessionId(tools, safeArgs);
+                if (resolved == null) {
+                    String query = String.valueOf(safeArgs.get("session_query"));
+                    return ToolResult.err(tool, safeArgs,
+                            "Could not resolve a session from query '" + query + "'.");
                 }
-                case "get_session" -> ToolResult.ok(tool, args,
-                        publicApi.getSession(requireLong(args, "session_id")));
-                case "whats_on_now" -> ToolResult.ok(tool, args,
-                        publicApi.currentSessions(demoNow.orElse(null)));
-                case "whats_next" -> ToolResult.ok(tool, args,
-                        publicApi.nextSessions(demoNow.orElse(null), asInt(args.get("limit"))));
-                case "find_speaker" -> {
-                    String name = asString(args.get("name"));
-                    SpeakerDto match = publicApi.listSpeakers().stream()
-                            .filter(s -> s.name() != null
-                                    && s.name().toLowerCase(Locale.ENGLISH)
-                                          .contains(name.toLowerCase(Locale.ENGLISH)))
-                            .findFirst().orElse(null);
-                    if (match == null) yield ToolResult.err(tool, args, "No speaker matching " + name);
-                    yield ToolResult.ok(tool, args, Map.of(
-                            "speaker", match,
-                            "sessions", publicApi.speakerSessions(match.id())));
-                }
-                case "bookmark_session" -> {
-                    Long sid = resolveSessionId(args);
-                    BookmarkDto bm = me.addBookmark(new CreateBookmarkRequest(sid));
-                    yield ToolResult.ok(tool, withResolved(args, sid), bm);
-                }
-                case "unbookmark_session" -> {
-                    Long sid = resolveSessionId(args);
-                    try (Response r = me.removeBookmark(sid)) {
-                        yield ToolResult.ok(tool, withResolved(args, sid),
-                                Map.of("ok", r.getStatus() < 300));
-                    }
-                }
-                case "my_agenda" -> ToolResult.ok(tool, args, me.myAgenda());
-                case "my_conflicts" -> ToolResult.ok(tool, args, me.conflicts());
-                case "my_ratings" -> ToolResult.ok(tool, args, me.myRatings());
-                case "my_session_feedback" -> {
-                    List<SessionFeedbackDto> fb = me.mySessionFeedback();
-                    yield ToolResult.ok(tool, args, fb);
-                }
-                case "rate_session" -> {
-                    Long sid = resolveSessionId(args);
-                    int stars = asInt(args.get("stars")) == null ? 5 : asInt(args.get("stars"));
-                    String comment = asString(args.get("comment"));
-                    try (Response r = me.rateSession(sid, new CreateRatingRequest(stars, comment))) {
-                        if (r.getStatus() == 422) {
-                            yield ToolResult.err(tool, withResolved(args, sid),
-                                    "Server rejected: " + r.readEntity(String.class));
-                        }
-                        RatingDto rating = r.readEntity(RatingDto.class);
-                        yield ToolResult.ok(tool, withResolved(args, sid), rating);
-                    }
-                }
-                case "view_session_attendees" -> {
-                    Long sid = resolveSessionId(args);
-                    try (Response r = me.sessionAttendees(sid)) {
-                        if (r.getStatus() == 401) {
-                            yield ToolResult.stepUp(tool, withResolved(args, sid));
-                        }
-                        if (r.getStatus() >= 400) {
-                            yield ToolResult.err(tool, withResolved(args, sid),
-                                    "Backend error " + r.getStatus());
-                        }
-                        List<AttendeeBookmarkDto> attendees = r.readEntity(
-                                new jakarta.ws.rs.core.GenericType<List<AttendeeBookmarkDto>>() {});
-                        yield ToolResult.ok(tool, withResolved(args, sid), attendees);
-                    }
-                }
-                case "cancel_my_session" -> {
-                    Long sid = resolveSessionId(args);
-                    String reason = asString(args.get("reason"));
-                    try {
-                        SessionDto s = me.cancelSession(sid,
-                                new CancelSessionRequest(reason == null ? "no reason given" : reason));
-                        yield ToolResult.ok(tool, withResolved(args, sid), s);
-                    } catch (WebApplicationException wae) {
-                        if (wae.getResponse().getStatus() == 401) {
-                            yield ToolResult.stepUp(tool, withResolved(args, sid));
-                        }
-                        throw wae;
-                    }
-                }
-                default -> ToolResult.err(tool, args, "Unknown tool: " + tool);
-            };
-        } catch (WebApplicationException wae) {
-            int st = wae.getResponse().getStatus();
-            if (st == 401) return ToolResult.stepUp(tool, args);
-            return ToolResult.err(tool, args, "HTTP " + st + " from conference-api");
+                safeArgs.remove("session_query");
+                safeArgs.put("session_id", resolved);
+            }
+
+            ToolExecutor executor = findExecutor(tools, tool);
+            if (executor == null) {
+                return ToolResult.err(tool, safeArgs, "Unknown MCP tool: " + tool);
+            }
+
+            String argsJson = mapper.writeValueAsString(safeArgs);
+            ToolExecutionRequest request = ToolExecutionRequest.builder()
+                    .name(tool)
+                    .arguments(argsJson)
+                    .build();
+            String resultText = executor.execute(request, null);
+            if (resultText != null && isStepUp(resultText)) {
+                return ToolResult.stepUp(tool, safeArgs);
+            }
+            return ToolResult.ok(tool, safeArgs, parseJsonIfPossible(resultText));
         } catch (Exception e) {
-            return ToolResult.err(tool, args, e.getClass().getSimpleName() + ": " + e.getMessage());
+            LOG.warnf(e, "MCP tool call failed: tool=%s", tool);
+            String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            if (isStepUp(msg)) {
+                return ToolResult.stepUp(tool, safeArgs);
+            }
+            return ToolResult.err(tool, safeArgs, e.getClass().getSimpleName() + ": " + msg);
         }
     }
 
-    private Long resolveSessionId(Map<String, Object> args) {
-        Long explicit = asLong(args.get("session_id"));
-        if (explicit != null) return explicit;
-        String query = asString(args.get("session_query"));
-        if (query == null || query.isBlank()) {
-            throw new WebApplicationException("session_query or session_id required", 400);
-        }
+    private Long resolveSessionId(ToolProviderResult tools, Map<String, Object> args) throws Exception {
+        Object queryRaw = args.get("session_query");
+        if (queryRaw == null) return null;
+        String query = queryRaw.toString().trim();
+        if (query.isEmpty()) return null;
+
         if ("current".equalsIgnoreCase(query)) {
-            List<SessionDto> now = publicApi.currentSessions(demoNow.orElse(null));
-            if (!now.isEmpty()) return now.get(0).id();
+            Long viaNow = firstSessionIdFromTool(tools, "whats_on_now", Map.of());
+            if (viaNow != null) return viaNow;
         }
-        List<SessionDto> matches = publicApi.listSessions(null, null, null, null, query);
-        if (matches.isEmpty()) {
-            throw new WebApplicationException("No session matched '" + query + "'", 404);
+        return firstSessionIdFromTool(tools, "list_sessions", Map.of("query", query));
+    }
+
+    private Long firstSessionIdFromTool(ToolProviderResult tools, String tool, Map<String, Object> args) throws Exception {
+        ToolExecutor executor = findExecutor(tools, tool);
+        if (executor == null) return null;
+        ToolExecutionRequest request = ToolExecutionRequest.builder()
+                .name(tool)
+                .arguments(mapper.writeValueAsString(args))
+                .build();
+        String body = executor.execute(request, null);
+        if (body == null || body.isBlank()) return null;
+        Object parsed = parseJsonIfPossible(body);
+        return firstId(parsed);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Long firstId(Object node) {
+        if (node instanceof List<?> list && !list.isEmpty()) {
+            return firstId(list.get(0));
         }
-        return matches.get(0).id();
+        if (node instanceof Map<?, ?> map) {
+            Object id = ((Map<String, Object>) map).get("id");
+            if (id instanceof Number n) return n.longValue();
+            if (id != null) {
+                try { return Long.parseLong(id.toString()); } catch (NumberFormatException ignore) { /* fall through */ }
+            }
+        }
+        return null;
     }
 
-    private static Map<String, Object> withResolved(Map<String, Object> args, Long sid) {
-        java.util.LinkedHashMap<String, Object> copy = new java.util.LinkedHashMap<>(args);
-        copy.put("session_id", sid);
-        return copy;
+    private static ToolExecutor findExecutor(ToolProviderResult tools, String name) {
+        for (AiServiceTool t : tools.aiServiceTools()) {
+            if (name.equals(t.name())) return t.toolExecutor();
+        }
+        return null;
     }
 
-    private static String asString(Object o) {
-        return o == null ? null : o.toString();
+    private static boolean hasNumeric(Map<String, Object> args, String key) {
+        Object v = args.get(key);
+        if (v == null) return false;
+        if (v instanceof Number) return true;
+        try { Long.parseLong(v.toString()); return true; } catch (NumberFormatException e) { return false; }
     }
 
-    private static Integer asInt(Object o) {
-        if (o == null) return null;
-        if (o instanceof Number n) return n.intValue();
-        try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
+    private Object parseJsonIfPossible(String raw) {
+        if (raw == null || raw.isBlank()) return raw;
+        String trimmed = raw.trim();
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+            return raw;
+        }
+        try {
+            return mapper.readValue(trimmed, Object.class);
+        } catch (Exception e) {
+            return raw;
+        }
     }
 
-    private static Long asLong(Object o) {
-        if (o == null) return null;
-        if (o instanceof Number n) return n.longValue();
-        try { return Long.parseLong(o.toString()); } catch (Exception e) { return null; }
-    }
-
-    private static Long requireLong(Map<String, Object> args, String key) {
-        Long v = asLong(args.get(key));
-        if (v == null) throw new WebApplicationException(key + " is required", 400);
-        return v;
+    private static boolean isStepUp(String message) {
+        if (message == null) return false;
+        String lower = message.toLowerCase();
+        return lower.contains("insufficient_user_authentication")
+                || lower.contains("step-up")
+                || lower.contains("acr_values");
     }
 
     public record ToolResult(String tool, Map<String, Object> args, Object result,
                               String error, boolean stepUpRequired) {
         public static ToolResult ok(String tool, Map<String, Object> args, Object result) {
-            return new ToolResult(tool, args, result, null, false);
+            return new ToolResult(tool, copy(args), result, null, false);
         }
         public static ToolResult err(String tool, Map<String, Object> args, String error) {
-            return new ToolResult(tool, args, null, error, false);
+            return new ToolResult(tool, copy(args), null, error, false);
         }
         public static ToolResult stepUp(String tool, Map<String, Object> args) {
-            return new ToolResult(tool, args, null,
+            return new ToolResult(tool, copy(args), null,
                     "insufficient_user_authentication: this tool requires step-up MFA",
                     true);
+        }
+        private static Map<String, Object> copy(Map<String, Object> a) {
+            return a == null ? Map.of() : new LinkedHashMap<>(a);
         }
     }
 }

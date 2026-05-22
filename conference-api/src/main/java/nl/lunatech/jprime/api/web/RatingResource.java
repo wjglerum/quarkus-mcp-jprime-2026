@@ -17,8 +17,8 @@ import nl.lunatech.jprime.api.clock.DemoClock;
 import nl.lunatech.jprime.api.domain.Attendee;
 import nl.lunatech.jprime.api.domain.Rating;
 import nl.lunatech.jprime.api.domain.Session;
-import nl.lunatech.jprime.api.web.Dtos.CreateRatingRequest;
-import nl.lunatech.jprime.api.web.Dtos.RatingDto;
+import nl.lunatech.jprime.api.dto.CreateRatingRequest;
+import nl.lunatech.jprime.api.dto.RatingDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 @Path("/api/v1/sessions/{id}/ratings")

@@ -23,6 +23,26 @@ html, body {
 }
 body { display: flex; flex-direction: column; }
 
+body::before {
+    content: '';
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 8px;
+    background: var(--brand);
+    z-index: 100;
+}
+
+.page-footer {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 28px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg-dim);
+}
+
 .topbar {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 28px;
@@ -69,21 +89,40 @@ main { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 0; min-hei
 }
 .sidebar-title:not(:first-child) { margin-top: 28px; }
 
-.quick-prompts { display: grid; gap: 6px; }
+.quick-prompts { display: grid; gap: 8px; }
 .quick-prompt {
     text-align: left; background: var(--surface-2);
-    border: 1px solid var(--border); border-left: 3px solid var(--brand);
-    color: var(--fg); padding: 8px 10px; border-radius: 6px;
+    border: 1px solid var(--border); border-top: 3px solid var(--brand);
+    color: var(--fg); padding: 10px 12px; border-radius: 6px;
     font-family: inherit; font-size: 13px; cursor: pointer;
     transition: background 120ms, border-color 120ms;
 }
 .quick-prompt:hover { background: #1c2331; }
-.quick-prompt[data-tier="step-up"] { border-left-color: var(--amber); }
-.quick-prompt[data-tier="speaker"] { border-left-color: var(--brand-2); }
+.quick-prompt[data-tier="step-up"] { border-top-color: var(--amber); }
+.quick-prompt[data-tier="speaker"] { border-top-color: var(--brand-2); }
+.quick-prompt .quick-prompt-label {
+    display: flex; align-items: flex-start; gap: 8px;
+}
+.quick-prompt .qp-icon {
+    width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px;
+    fill: var(--brand);
+}
+.quick-prompt[data-tier="step-up"] .qp-icon { fill: var(--amber); }
+.quick-prompt[data-tier="speaker"] .qp-icon { fill: var(--brand-2); }
 .quick-prompt .tier {
     display: block; font-size: 10px; color: var(--fg-dim);
-    margin-top: 2px; font-family: var(--font-mono); text-transform: lowercase;
+    margin-top: 4px; font-family: var(--font-mono); text-transform: lowercase;
 }
+
+.provider-select-label {
+    display: block; font-size: 12px; color: var(--fg-muted); margin-bottom: 6px;
+}
+.provider-select {
+    width: 100%; padding: 8px 10px; border-radius: 6px;
+    background: var(--surface-2); color: var(--fg);
+    border: 1px solid var(--border); font-family: inherit; font-size: 13px;
+}
+.provider-select option:disabled { color: var(--fg-dim); }
 
 .mode-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .mode-toggle input { display: none; }
@@ -140,6 +179,29 @@ main { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 0; min-hei
 }
 .bubble.intro p { margin: 0 0 8px; }
 .bubble.intro p:last-child { margin-bottom: 0; }
+
+.hero-empty {
+    display: flex; flex-direction: column; gap: 20px;
+    padding: 8px 0 24px;
+}
+.hero-row {
+    display: grid; grid-template-columns: 180px 1fr; gap: 24px; align-items: baseline;
+}
+.hero-word {
+    font-size: 56px; font-weight: 700; color: var(--brand);
+    line-height: 1; letter-spacing: -0.01em;
+}
+.hero-desc {
+    color: var(--fg-muted); font-size: 15px; line-height: 1.55; margin: 0;
+}
+.hero-desc code {
+    font-family: var(--font-mono); font-size: 13px;
+    background: var(--surface); color: var(--fg); padding: 1px 5px; border-radius: 4px;
+}
+@media (max-width: 880px) {
+    .hero-row { grid-template-columns: 1fr; gap: 6px; }
+    .hero-word { font-size: 36px; }
+}
 .bubble-meta {
     display: flex; justify-content: space-between; align-items: center;
     font-family: var(--font-mono); font-size: 11px;
@@ -211,6 +273,10 @@ main { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 0; min-hei
 }
 .tool-stepup strong { color: var(--amber); display: block; margin-bottom: 4px; }
 .tool-stepup code { font-family: var(--font-mono); background: var(--surface); color: var(--fg); padding: 1px 5px; border-radius: 4px; }
+.tool-stepup .stepup-caption {
+    margin: 8px 0 0; font-style: italic; color: var(--fg-muted); font-size: 13px;
+    font-family: var(--font-sans);
+}
 
 [data-bind-card][hidden],
 [data-bind-error][hidden],

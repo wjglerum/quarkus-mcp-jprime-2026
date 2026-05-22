@@ -21,21 +21,25 @@ class PublicEndpointsTest {
     }
 
     @Test
-    void filtersByDay() {
-        given().queryParam("day", 2)
-                .when().get("/api/v1/sessions")
-                .then().statusCode(200)
-                .body("day", hasItem(2))
-                .body("day.unique()", hasItem(2));
-    }
-
-    @Test
     void filtersByQuery() {
-        given().queryParam("q", "Concurrency")
+        given().queryParam("q", "Concurrency Crossroads")
                 .when().get("/api/v1/sessions")
                 .then().statusCode(200)
                 .body("size()", greaterThan(0))
-                .body("title", hasItem("Concurrency Crossroads: Virtual Threads, Loom and Beyond"));
+                .body("title[0]", org.hamcrest.Matchers.containsString("Concurrency Crossroads"));
+    }
+
+    @Test
+    void filtersBySpeakerId() {
+        Integer speakerId = given().when().get("/api/v1/speakers")
+                .then().statusCode(200)
+                .extract().jsonPath()
+                .getInt("find { it.name == 'Willem Jan Glerum' }.id");
+        given().queryParam("speaker_id", speakerId)
+                .when().get("/api/v1/sessions")
+                .then().statusCode(200)
+                .body("size()", greaterThan(0))
+                .body("title", hasItem("Practical MCP Security in Action"));
     }
 
     @Test
@@ -47,7 +51,7 @@ class PublicEndpointsTest {
         given().when().get("/api/v1/sessions/{id}", id)
                 .then().statusCode(200)
                 .body("title", notNullValue())
-                .body("speakers.size()", greaterThan(0));
+                .body("speaker", notNullValue());
     }
 
     @Test
@@ -71,13 +75,7 @@ class PublicEndpointsTest {
     void listsSpeakers() {
         given().when().get("/api/v1/speakers")
                 .then().statusCode(200)
-                .body("name", hasItem("Willem Jan Glerum"));
-    }
-
-    @Test
-    void roomsListSurfacesAtLeastOneRoom() {
-        given().when().get("/api/v1/rooms")
-                .then().statusCode(200)
-                .body("size()", greaterThan(0));
+                .body("name", hasItem("Willem Jan Glerum"))
+                .body("find { it.name == 'Willem Jan Glerum' }.sessions.size()", greaterThan(0));
     }
 }

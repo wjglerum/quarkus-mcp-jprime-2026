@@ -4,90 +4,89 @@
     const transcript = document.getElementById('transcript');
     const composer = document.getElementById('composer');
     const promptInput = document.getElementById('prompt');
-    const quickPromptsEl = document.getElementById('quick-prompts');
-    const whoEl = document.getElementById('who');
-    const introNameEl = document.getElementById('intro-name');
-    const identityEl = document.getElementById('identity');
     const modeToggle = document.getElementById('mode-llm');
     const modePill = document.getElementById('mode-pill');
+    const footerMode = document.getElementById('footer-mode');
     const modeHelp = document.getElementById('mode-help');
+    const providerSelect = document.getElementById('provider-select');
+    const providerHelp = document.getElementById('provider-help');
+    const quickPromptsEl = document.getElementById('quick-prompts');
 
-    let me = null;
-    let llmEnabled = false;
+    const me = window.__ME__ || { subject: 'unknown', name: 'unknown', provider: 'scripted' };
+    let activeProvider = me.provider || 'scripted';
+    let llmEnabled = activeProvider !== 'scripted';
 
     const STEP_UP_TOOLS = new Set(['view_session_attendees', 'cancel_my_session']);
     const DESTRUCTIVE_TOOLS = new Set(['cancel_my_session']);
 
-    async function loadMe() {
-        const res = await fetch('/api/chat/me', { credentials: 'same-origin' });
-        if (!res.ok) throw new Error('not authenticated');
-        me = await res.json();
-        whoEl.textContent = me.name || me.subject;
-        if (introNameEl) introNameEl.textContent = me.name || me.subject;
-        renderIdentity();
-        llmEnabled = !!me.llmAvailable;
+    function updateModePill() {
+        const llm = modeToggle.checked && llmEnabled;
+        const label = llm ? activeProvider : 'scripted';
+        modePill.textContent = label;
+        modePill.classList.toggle('llm', llm);
+        if (footerMode) footerMode.textContent = label;
+    }
+
+    function refreshProviderUiFromSnapshot(snap) {
+        const providers = snap.providers || [];
+        activeProvider = snap.active || activeProvider;
+        providerSelect.innerHTML = '';
+        for (const p of providers) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            const tag = p.available ? '' : ' (unavailable)';
+            const model = p.model ? ' / ' + p.model : '';
+            opt.textContent = p.id + model + tag;
+            opt.disabled = !p.available;
+            if (p.id === activeProvider) opt.selected = true;
+            providerSelect.appendChild(opt);
+        }
+        llmEnabled = activeProvider !== 'scripted';
         modeToggle.disabled = !llmEnabled;
-        if (!llmEnabled) {
-            modeHelp.textContent = 'Set ANTHROPIC_API_KEY and CHAT_LLM_ENABLED=true to enable Claude.';
-        }
+        if (!llmEnabled) modeToggle.checked = false;
+        else modeToggle.checked = true;
+        updateModePill();
     }
 
-    function renderIdentity() {
-        identityEl.innerHTML = '';
-        const rows = [
-            ['subject', me.subject],
-            ['name', me.name],
-            ['roles', (me.roles || []).join(', ') || '(none)'],
-            ['acr', String(me.acr)],
-            ['amr', Array.isArray(me.amr) ? me.amr.join(', ') : String(me.amr)]
-        ];
-        for (const [k, v] of rows) {
-            const dt = document.createElement('dt'); dt.textContent = k;
-            const dd = document.createElement('dd'); dd.textContent = v;
-            if (k === 'subject' || k === 'name') dd.classList.add('amber');
-            identityEl.appendChild(dt);
-            identityEl.appendChild(dd);
+    providerSelect.addEventListener('change', async () => {
+        const choice = providerSelect.value;
+        const res = await fetch('/api/chat/provider', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: choice })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            providerHelp.textContent = 'Switch failed: ' + (err.error || res.status);
+            return;
         }
-    }
-
-    async function loadQuickPrompts() {
-        const res = await fetch('/api/chat/quick-prompts', { credentials: 'same-origin' });
-        if (!res.ok) return;
-        const list = await res.json();
-        quickPromptsEl.innerHTML = '';
-        for (const q of list) {
-            const btn = document.createElement('button');
-            btn.className = 'quick-prompt';
-            btn.dataset.tier = q.tier;
-            btn.type = 'button';
-            const main = document.createElement('span');
-            main.textContent = q.label;
-            const tier = document.createElement('span');
-            tier.className = 'tier';
-            tier.textContent = q.suggestedTool + ' / ' + q.tier;
-            btn.appendChild(main);
-            btn.appendChild(tier);
-            btn.addEventListener('click', () => {
-                promptInput.value = q.label;
-                composer.requestSubmit();
-            });
-            quickPromptsEl.appendChild(btn);
-        }
-    }
+        const snap = await res.json();
+        providerHelp.textContent = 'Active provider: ' + (snap.active || choice) + '.';
+        refreshProviderUiFromSnapshot(snap);
+    });
 
     modeToggle.addEventListener('change', () => {
+        updateModePill();
         const llm = modeToggle.checked && llmEnabled;
-        modePill.textContent = llm ? 'llm' : 'scripted';
-        modePill.classList.toggle('llm', llm);
         modeHelp.textContent = llm
-            ? 'Claude decides which tool to call. The MCP tools are passed in the request.'
+            ? activeProvider + ' decides which tool to call. The MCP tools are passed in the request.'
             : 'Default. Deterministic intent matcher.';
+    });
+
+    quickPromptsEl.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('.quick-prompt');
+        if (!btn) return;
+        const label = btn.dataset.label || btn.textContent.trim();
+        promptInput.value = label;
+        composer.requestSubmit();
     });
 
     composer.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         const text = promptInput.value.trim();
         if (!text) return;
+        clearHero();
         addUserBubble(text);
         promptInput.value = '';
         try {
@@ -100,6 +99,16 @@
                     mode: modeToggle.checked && llmEnabled ? 'llm' : 'scripted'
                 })
             });
+            if (res.status === 503) {
+                const body = await res.json().catch(() => ({}));
+                if (body && body.error === 'provider_unavailable') {
+                    addAssistantBubble({
+                        note: 'LLM provider unavailable. Switch back to scripted mode to continue.',
+                        result: { error: 'provider_unavailable', active: body.active }
+                    });
+                    return;
+                }
+            }
             if (!res.ok) {
                 addAssistantBubble({
                     note: 'Backend returned HTTP ' + res.status + '.',
@@ -117,10 +126,15 @@
         }
     });
 
+    function clearHero() {
+        const hero = transcript.querySelector('.hero-empty');
+        if (hero) hero.remove();
+    }
+
     function addUserBubble(text) {
         const tmpl = document.getElementById('user-bubble');
         const node = tmpl.content.cloneNode(true);
-        node.querySelector('[data-bind="who"]').textContent = me ? (me.name || me.subject) : 'me';
+        node.querySelector('[data-bind="who"]').textContent = me.name || me.subject;
         node.querySelector('[data-bind="time"]').textContent = nowHHMMSS();
         node.querySelector('[data-bind="text"]').textContent = text;
         transcript.appendChild(node);
@@ -200,12 +214,5 @@
         });
     }
 
-    (async () => {
-        try {
-            await loadMe();
-            await loadQuickPrompts();
-        } catch (e) {
-            whoEl.textContent = 'not logged in';
-        }
-    })();
+    updateModePill();
 })();

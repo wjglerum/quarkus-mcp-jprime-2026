@@ -43,7 +43,9 @@ class RatingTest {
     @Test
     @TestSecurity(user = "rater-2", roles = {"attendee"})
     void rateSessionThatHasNotStartedReturns422() {
-        int id = sessionId("Day 1 Closing");
+        // "Beyond the LLM API" runs on day 2 at 16:25, well after the rehearsal
+        // clock above (day 1 at 13:30), so the server should refuse the rating.
+        int id = sessionId("Beyond the LLM API");
         given().contentType("application/json")
                 .body("{\"stars\":4,\"comment\":\"too early\"}")
                 .when().post("/api/v1/sessions/" + id + "/ratings")

@@ -21,7 +21,7 @@ class AuditDashboardTest {
     @Test
     @TestSecurity(user = "dashboard-tester", roles = {"attendee"})
     void recentSurfacesEventsWrittenByOthers() {
-        int sessionId = given().queryParam("q", "Keynote")
+        int sessionId = given().queryParam("q", "Practical MCP Security")
                 .when().get("/api/v1/sessions")
                 .then().statusCode(200)
                 .extract().jsonPath().getInt("[0].id");
@@ -37,12 +37,5 @@ class AuditDashboardTest {
                 .body("size()", greaterThanOrEqualTo(1))
                 .body("[0].attendeeSubject", equalTo("dashboard-tester"))
                 .body("action", hasItem("BOOKMARK_ADD"));
-    }
-
-    @Test
-    void liveAuditPageIsServedAsStaticAsset() {
-        given().when().get("/audit-live/")
-                .then().statusCode(200)
-                .body(org.hamcrest.Matchers.containsString("Practical MCP Security in Action"));
     }
 }

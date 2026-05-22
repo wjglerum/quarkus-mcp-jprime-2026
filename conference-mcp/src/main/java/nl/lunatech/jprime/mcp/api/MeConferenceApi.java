@@ -10,6 +10,13 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import nl.lunatech.jprime.mcp.dto.BookmarkDto;
+import nl.lunatech.jprime.mcp.dto.CancelSessionRequest;
+import nl.lunatech.jprime.mcp.dto.CreateBookmarkRequest;
+import nl.lunatech.jprime.mcp.dto.CreateRatingRequest;
+import nl.lunatech.jprime.mcp.dto.RatingDto;
+import nl.lunatech.jprime.mcp.dto.SessionDto;
+import nl.lunatech.jprime.mcp.dto.SessionFeedbackDto;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 import java.util.List;
@@ -23,11 +30,11 @@ public interface MeConferenceApi {
 
     @GET
     @Path("/me/agenda")
-    List<Dtos.BookmarkDto> myAgenda();
+    List<BookmarkDto> myAgenda();
 
     @POST
     @Path("/me/agenda")
-    Dtos.BookmarkDto addBookmark(Dtos.CreateBookmarkRequest req);
+    BookmarkDto addBookmark(CreateBookmarkRequest req);
 
     @DELETE
     @Path("/me/agenda/{sessionId}")
@@ -35,19 +42,19 @@ public interface MeConferenceApi {
 
     @GET
     @Path("/me/conflicts")
-    List<List<Dtos.SessionDto>> conflicts();
+    List<SessionDto> conflicts();
 
     @POST
     @Path("/sessions/{id}/ratings")
-    Response rateSession(@PathParam("id") Long sessionId, Dtos.CreateRatingRequest req);
+    Response rateSession(@PathParam("id") Long sessionId, CreateRatingRequest req);
 
     @GET
     @Path("/me/ratings")
-    List<Dtos.RatingDto> myRatings();
+    List<RatingDto> myRatings();
 
     @GET
     @Path("/me/sessions/feedback")
-    List<Dtos.SessionFeedbackDto> mySessionFeedback();
+    List<SessionFeedbackDto> mySessionFeedback();
 
     @GET
     @Path("/sessions/{id}/attendees")
@@ -55,5 +62,5 @@ public interface MeConferenceApi {
 
     @POST
     @Path("/sessions/{id}/cancel")
-    Dtos.SessionDto cancelSession(@PathParam("id") Long sessionId, Dtos.CancelSessionRequest req);
+    SessionDto cancelSession(@PathParam("id") Long sessionId, CancelSessionRequest req);
 }

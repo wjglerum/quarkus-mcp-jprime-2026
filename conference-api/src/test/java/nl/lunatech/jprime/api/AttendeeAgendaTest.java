@@ -14,7 +14,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 class AttendeeAgendaTest {
 
     private static int bookmarkableSessionId() {
-        return given().queryParam("q", "Keynote")
+        return given().queryParam("q", "Practical MCP Security")
                 .when().get("/api/v1/sessions")
                 .then().statusCode(200)
                 .extract().jsonPath().getInt("[0].id");

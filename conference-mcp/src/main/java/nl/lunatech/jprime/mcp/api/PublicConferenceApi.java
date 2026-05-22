@@ -6,6 +6,8 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import nl.lunatech.jprime.mcp.dto.SessionDto;
+import nl.lunatech.jprime.mcp.dto.SpeakerDto;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 import java.util.List;
@@ -17,30 +19,23 @@ public interface PublicConferenceApi {
 
     @GET
     @Path("/sessions")
-    List<Dtos.SessionDto> listSessions(
-            @QueryParam("day") Integer day,
-            @QueryParam("track") String track,
+    List<SessionDto> listSessions(
             @QueryParam("speaker_id") Long speakerId,
-            @QueryParam("level") String level,
             @QueryParam("q") String q);
 
     @GET
     @Path("/sessions/{id}")
-    Dtos.SessionDto getSession(@PathParam("id") Long id);
+    SessionDto getSession(@PathParam("id") Long id);
 
     @GET
     @Path("/sessions/current")
-    List<Dtos.SessionDto> currentSessions(@QueryParam("at") String at);
+    List<SessionDto> currentSessions(@QueryParam("at") String at);
 
     @GET
     @Path("/sessions/next")
-    List<Dtos.SessionDto> nextSessions(@QueryParam("at") String at, @QueryParam("limit") Integer limit);
+    List<SessionDto> nextSessions(@QueryParam("at") String at, @QueryParam("limit") Integer limit);
 
     @GET
     @Path("/speakers")
-    List<Dtos.SpeakerDto> listSpeakers();
-
-    @GET
-    @Path("/speakers/{id}/sessions")
-    List<Dtos.SessionDto> speakerSessions(@PathParam("id") Long id);
+    List<SpeakerDto> listSpeakers();
 }

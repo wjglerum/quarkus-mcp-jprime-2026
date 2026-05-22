@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>jPrime 2026 / Conference Companion</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/chat.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="shield" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/>
+      </svg>
+      <span class="brand-title">Practical MCP Security in Action</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">jPrime 2026 Conference Companion</span>
+    </div>
+    <div class="status" id="status">
+      <span class="dot live"></span>
+      <span class="who" id="who">{me.name ?: me.subject}</span>
+      <span class="brand-sep">/</span>
+      <span class="mode-pill{#if mode != 'scripted'} llm{/if}" id="mode-pill">{mode}</span>
+    </div>
+  </header>
+
+  <main>
+    <aside class="sidebar">
+      <h2 class="sidebar-title">Quick prompts</h2>
+      <div class="quick-prompts" id="quick-prompts">
+        {#for q in quickPrompts}
+        <button type="button" class="quick-prompt" data-tier="{q.tier}" data-label="{q.label}">
+          <span class="quick-prompt-label">
+            <svg class="qp-icon" viewBox="0 0 24 24" aria-hidden="true">
+              {#switch q.tier}
+                {#case 'public'}
+                <path d="M10 2a8 8 0 105 14.3l5 5 1.4-1.4-5-5A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/>
+                {#case 'attendee'}
+                <path d="M6 3h12v18l-6-4-6 4V3z"/>
+                {#case 'speaker'}
+                <path d="M12 2l3 7h7l-5.5 4.5L18 22l-6-4.5L6 22l1.5-8.5L2 9h7z"/>
+                {#case 'step-up'}
+                <path d="M6 10V8a6 6 0 0112 0v2h2v12H4V10h2zm2 0h8V8a4 4 0 10-8 0v2z"/>
+                {#case}
+                <circle cx="12" cy="12" r="4"/>
+              {/switch}
+            </svg>
+            <span>{q.label}</span>
+          </span>
+          <span class="tier">{q.suggestedTool} / {q.tier}</span>
+        </button>
+        {/for}
+      </div>
+
+      <h2 class="sidebar-title">Provider</h2>
+      <label class="provider-select-label" for="provider-select">LLM provider</label>
+      <select id="provider-select" class="provider-select">
+        {#for p in providers.providers}
+        <option value="{p.id}"{#if p.id == providers.active} selected{/if}{#if !p.available} disabled{/if}>{p.id}{#if p.model} / {p.model}{/if}{#if !p.available} (unavailable){/if}</option>
+        {/for}
+      </select>
+      <p class="mode-help" id="provider-help">scripted means no LLM is called; the deterministic intent matcher picks the tool.</p>
+
+      <h2 class="sidebar-title">Mode</h2>
+      <label class="mode-toggle">
+        <input type="checkbox" id="mode-llm"{#if mode != 'scripted'} checked{/if}{#if providers.active == 'scripted'} disabled{/if}>
+        <span class="mode-track"><span class="mode-knob"></span></span>
+        <span class="mode-label">Let the LLM pick the tool</span>
+      </label>
+      <p class="mode-help" id="mode-help">Default. Deterministic intent matcher.</p>
+
+      <h2 class="sidebar-title">Identity</h2>
+      <dl class="identity" id="identity">
+        <dt>subject</dt><dd class="amber">{me.subject}</dd>
+        <dt>name</dt><dd class="amber">{me.name}</dd>
+        <dt>roles</dt><dd>{me.rolesDisplay}</dd>
+        <dt>acr</dt><dd>{me.acr}</dd>
+        <dt>amr</dt><dd>{me.amrDisplay}</dd>
+      </dl>
+
+      <h2 class="sidebar-title">Companion screens</h2>
+      <ul class="links">
+        <li><a href="http://localhost:8080/audit-live/" target="_blank">Audit dashboard</a></li>
+        <li><a href="http://localhost:8080/q/swagger-ui/" target="_blank">conference-api swagger</a></li>
+        <li><a href="http://localhost:8081/q/dev/" target="_blank">conference-mcp Dev UI</a></li>
+      </ul>
+    </aside>
+
+    <section class="chat">
+      <div class="transcript" id="transcript">
+        <div class="hero-empty">
+          <div class="hero-row">
+            <span class="hero-word">Who.</span>
+            <p class="hero-desc">{me.name ?: me.subject}. Named, authenticated, auditable. The AI never gets to be anonymous on stage.</p>
+          </div>
+          <div class="hero-row">
+            <span class="hero-word">What.</span>
+            <p class="hero-desc">Every prompt becomes an MCP tool call. The wire is visible. The arguments are explicit.</p>
+          </div>
+          <div class="hero-row">
+            <span class="hero-word">Provable.</span>
+            <p class="hero-desc">Every server-side action lands in <code>audit_event</code> within two seconds on the second screen.</p>
+          </div>
+        </div>
+      </div>
+
+      <form class="composer" id="composer">
+        <input type="text" id="prompt" name="prompt" autocomplete="off"
+               placeholder="Try: What's on now? / Bookmark the JSpecify talk / Rate this 5 stars">
+        <button type="submit" class="send" aria-label="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <span>Practical MCP Security in Action  /  jPrime 2026</span>
+    <span>conference-chat  /  <span id="footer-mode">{mode}</span></span>
+  </footer>
+
+  <script>
+    window.__ME__ = {
+      subject: "{me.subject}",
+      name: "{me.name}",
+      provider: "{providers.active}"
+    };
+  </script>
+
+  <template id="user-bubble">
+    <div class="bubble user">
+      <div class="bubble-meta"><span class="role" data-bind="who"></span><span class="time" data-bind="time"></span></div>
+      <p data-bind="text"></p>
+    </div>
+  </template>
+
+  <template id="assistant-bubble">
+    <div class="bubble assistant">
+      <div class="bubble-meta"><span class="role">assistant</span><span class="time" data-bind="time"></span></div>
+      <p class="note" data-bind="note"></p>
+      <article class="tool-card" data-bind-card>
+        <header class="tool-head">
+          <span class="tool-type" data-bind="toolType">mcp.tool_call</span>
+          <span class="tool-name" data-bind="toolName"></span>
+          <span class="tool-tier" data-bind="toolTier"></span>
+        </header>
+        <pre class="tool-args" data-bind="toolArgs"></pre>
+        <header class="tool-head subdued">
+          <span class="tool-type">mcp.tool_result</span>
+        </header>
+        <pre class="tool-result" data-bind="toolResult"></pre>
+      </article>
+      <div class="tool-error" data-bind-error data-bind="errorText"></div>
+      <div class="tool-stepup" data-bind-stepup>
+        <strong>Step-up required.</strong>
+        <span>The server replied <code>insufficient_user_authentication</code>. Open the Keycloak login window, enter your TOTP code, then retry.</span>
+        <p class="stepup-caption">Server says: this tool needs MFA. Client re-authenticates. Done.</p>
+      </div>
+    </div>
+  </template>
+
+  <script src="/chat.js"></script>
+</body>
+</html>

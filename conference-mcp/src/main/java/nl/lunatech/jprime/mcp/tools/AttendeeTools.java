@@ -3,36 +3,34 @@ package nl.lunatech.jprime.mcp.tools;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolCallException;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
-import nl.lunatech.jprime.mcp.api.Dtos.BookmarkDto;
-import nl.lunatech.jprime.mcp.api.Dtos.CreateBookmarkRequest;
-import nl.lunatech.jprime.mcp.api.Dtos.CreateRatingRequest;
-import nl.lunatech.jprime.mcp.api.Dtos.RatingDto;
-import nl.lunatech.jprime.mcp.api.Dtos.SessionDto;
+import nl.lunatech.jprime.mcp.dto.Acknowledgement;
+import nl.lunatech.jprime.mcp.dto.BookmarkDto;
+import nl.lunatech.jprime.mcp.dto.CreateBookmarkRequest;
+import nl.lunatech.jprime.mcp.dto.CreateRatingRequest;
+import nl.lunatech.jprime.mcp.dto.RatingDto;
+import nl.lunatech.jprime.mcp.dto.SessionDto;
 import nl.lunatech.jprime.mcp.api.MeConferenceApi;
-import nl.lunatech.jprime.mcp.security.McpSecurity;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import java.util.List;
 
 @ApplicationScoped
+@RolesAllowed("attendee")
 public class AttendeeTools {
 
     @Inject
     @RestClient
     MeConferenceApi me;
 
-    @Inject
-    McpSecurity security;
-
     @Tool(name = "bookmark_session",
             description = "Add a session to my personal agenda. Recorded under MY identity and "
                     + "audited. Returns the new bookmark.")
     public BookmarkDto bookmarkSession(
             @ToolArg(name = "session_id", description = "Numeric session id", required = true) Long sessionId) {
-        security.requireRole("attendee");
         return me.addBookmark(new CreateBookmarkRequest(sessionId));
     }
 
@@ -40,7 +38,6 @@ public class AttendeeTools {
             description = "Remove a session from my personal agenda.")
     public Acknowledgement unbookmarkSession(
             @ToolArg(name = "session_id", description = "Numeric session id", required = true) Long sessionId) {
-        security.requireRole("attendee");
         Response r = me.removeBookmark(sessionId);
         return new Acknowledgement(r.getStatus() < 300, "session " + sessionId + " removed from agenda");
     }
@@ -48,15 +45,13 @@ public class AttendeeTools {
     @Tool(name = "my_agenda",
             description = "Show the sessions on my personal agenda, ordered by start time.")
     public List<BookmarkDto> myAgenda() {
-        security.requireRole("attendee");
         return me.myAgenda();
     }
 
     @Tool(name = "my_conflicts",
             description = "Show me sessions I've bookmarked that overlap in time. "
                     + "Useful when planning the conference day.")
-    public List<List<SessionDto>> myConflicts() {
-        security.requireRole("attendee");
+    public List<SessionDto> myConflicts() {
         return me.conflicts();
     }
 
@@ -69,7 +64,6 @@ public class AttendeeTools {
             @ToolArg(name = "stars", description = "Rating between 1 and 5", required = true) Integer stars,
             @ToolArg(name = "comment", description = "Optional free-text comment", required = false)
             String comment) {
-        security.requireRole("attendee");
         if (stars == null || stars < 1 || stars > 5) {
             throw new ToolCallException("invalid_argument: stars must be between 1 and 5");
         }
@@ -83,9 +77,6 @@ public class AttendeeTools {
     @Tool(name = "my_ratings",
             description = "List the ratings I have submitted.")
     public List<RatingDto> myRatings() {
-        security.requireRole("attendee");
         return me.myRatings();
     }
-
-    public record Acknowledgement(boolean ok, String message) {}
 }

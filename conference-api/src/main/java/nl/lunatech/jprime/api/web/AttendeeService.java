@@ -29,26 +29,15 @@ public class AttendeeService {
         Attendee fresh = new Attendee();
         fresh.subject = subject;
         fresh.displayName = nameFromJwt();
-        fresh.email = jwt.getClaim("email");
-        fresh.isSpeaker = hasSpeakerRole();
         fresh.speaker = matchSpeaker(fresh);
         fresh.persist();
         return fresh;
     }
 
     private Speaker matchSpeaker(Attendee a) {
-        if (!a.isSpeaker) return null;
-        if (a.displayName != null) {
-            Speaker byName = Speaker.find("lower(name) = ?1", a.displayName.toLowerCase()).firstResult();
-            if (byName != null) return byName;
-        }
-        if (a.email != null) {
-            Speaker byHandle = Speaker.find("twitterHandle = ?1", a.email).firstResult();
-            if (byHandle != null) return byHandle;
-        }
-        // Pragmatic demo shortcut: subject "willem.jan" -> Willem Jan speaker.
+        if (!hasSpeakerRole()) return null;
         if ("willem.jan".equals(a.subject)) {
-            return Speaker.find("lower(name) = ?1", "willem jan glerum").firstResult();
+            return Speaker.find("name", "Willem Jan Glerum").firstResult();
         }
         return null;
     }
@@ -61,21 +50,17 @@ public class AttendeeService {
         return identity.getPrincipal().getName();
     }
 
-    public boolean hasAttendeeRole() {
-        return jwt.getGroups().contains("attendee");
-    }
-
     public boolean hasSpeakerRole() {
-        return jwt.getGroups().contains("speaker");
+        return roles().contains("speaker");
     }
 
     public boolean hasStrongAcr() {
-        Object acr = jwt.getClaim("acr");
+        Object acr = jwt == null ? null : jwt.getClaim("acr");
         if (acr != null && ("2".equals(acr.toString())
                 || "urn:mace:incommon:iap:silver".equals(acr.toString()))) {
             return true;
         }
-        Object amr = jwt.getClaim("amr");
+        Object amr = jwt == null ? null : jwt.getClaim("amr");
         if (amr instanceof Iterable<?> it) {
             for (Object o : it) {
                 if ("mfa".equals(String.valueOf(o)) || "otp".equals(String.valueOf(o))) {
@@ -92,14 +77,12 @@ public class AttendeeService {
             a.displayName = nameFromJwt();
             dirty = true;
         }
-        if (a.email == null && jwt.containsClaim("email")) {
-            a.email = jwt.getClaim("email");
-            dirty = true;
-        }
-        boolean speakerRole = hasSpeakerRole();
-        if (a.isSpeaker != speakerRole) {
-            a.isSpeaker = speakerRole;
-            dirty = true;
+        if (a.speaker == null && hasSpeakerRole()) {
+            Speaker sp = matchSpeaker(a);
+            if (sp != null) {
+                a.speaker = sp;
+                dirty = true;
+            }
         }
         if (dirty) a.persist();
         return a;
@@ -116,6 +99,9 @@ public class AttendeeService {
     }
 
     public Set<String> roles() {
+        if (identity != null) {
+            return identity.getRoles();
+        }
         return jwt.getGroups();
     }
 }

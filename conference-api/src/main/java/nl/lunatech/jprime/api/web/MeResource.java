@@ -19,12 +19,12 @@ import nl.lunatech.jprime.api.domain.Attendee;
 import nl.lunatech.jprime.api.domain.Bookmark;
 import nl.lunatech.jprime.api.domain.Rating;
 import nl.lunatech.jprime.api.domain.Session;
-import nl.lunatech.jprime.api.web.Dtos.AttendeeDto;
-import nl.lunatech.jprime.api.web.Dtos.BookmarkDto;
-import nl.lunatech.jprime.api.web.Dtos.CreateBookmarkRequest;
-import nl.lunatech.jprime.api.web.Dtos.RatingDto;
-import nl.lunatech.jprime.api.web.Dtos.SessionDto;
-import nl.lunatech.jprime.api.web.Dtos.SessionFeedbackDto;
+import nl.lunatech.jprime.api.dto.AttendeeDto;
+import nl.lunatech.jprime.api.dto.BookmarkDto;
+import nl.lunatech.jprime.api.dto.CreateBookmarkRequest;
+import nl.lunatech.jprime.api.dto.RatingDto;
+import nl.lunatech.jprime.api.dto.SessionDto;
+import nl.lunatech.jprime.api.dto.SessionFeedbackDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.ArrayList;
@@ -95,22 +95,27 @@ public class MeResource {
     @GET
     @Path("/conflicts")
     @Transactional
-    public List<List<SessionDto>> conflicts() {
+    public List<SessionDto> conflicts() {
         Attendee me = attendees.currentAttendee();
         List<Session> sessions = Bookmark.listByAttendee(me.id).stream()
                 .map(b -> b.session)
                 .toList();
-        List<List<SessionDto>> clusters = new ArrayList<>();
+        java.util.Set<Long> overlapping = new java.util.LinkedHashSet<>();
         for (int i = 0; i < sessions.size(); i++) {
             for (int j = i + 1; j < sessions.size(); j++) {
                 Session a = sessions.get(i);
                 Session b = sessions.get(j);
                 if (a.overlaps(b)) {
-                    clusters.add(List.of(SessionDto.of(a), SessionDto.of(b)));
+                    overlapping.add(a.id);
+                    overlapping.add(b.id);
                 }
             }
         }
-        return clusters;
+        List<SessionDto> out = new ArrayList<>();
+        for (Session s : sessions) {
+            if (overlapping.contains(s.id)) out.add(SessionDto.of(s));
+        }
+        return out;
     }
 
     @GET
@@ -129,7 +134,7 @@ public class MeResource {
         Attendee me = attendees.currentAttendee();
         if (me.speaker == null) return List.of();
         List<Session> mine = Session.list(
-                "select distinct s from Session s join s.speakers sp where sp.id = ?1 order by s.startsAt",
+                "from Session s where s.speaker.id = ?1 order by s.startsAt",
                 me.speaker.id);
         List<SessionFeedbackDto> out = new ArrayList<>();
         for (Session s : mine) {

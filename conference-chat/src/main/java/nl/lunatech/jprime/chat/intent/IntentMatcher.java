@@ -8,10 +8,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Tiny rules engine that maps a user prompt to one MCP tool invocation.
- * Used in scripted mode so the demo never depends on an LLM being reachable.
- */
 @ApplicationScoped
 public class IntentMatcher {
 
@@ -21,7 +17,9 @@ public class IntentMatcher {
     private static final Pattern COMMENT_QUOTED = Pattern.compile(
             "(?:comment|note|saying)\\s+['\"](?<c>[^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
     private static final Pattern SESSION_TITLE_AFTER = Pattern.compile(
-            "(?:bookmark|add|register for|sign me up for|cancel|kill|drop)\\s+(?:the\\s+)?(?<t>[A-Za-z][^,?!]+?)(?:\\s+talk|\\s+session|\\s+keynote|\\b)",
+            "(?:bookmark|add|register for|sign me up for|signed up for|going to|find|cancel|kill|drop)"
+                    + "\\s+(?:the\\s+|my\\s+)?(?<t>[A-Za-z][^,?!]+?)"
+                    + "(?:\\s+(?:deep\\s+dive|talk|session|keynote|workshop)|\\?|\\.|$)",
             Pattern.CASE_INSENSITIVE);
 
     public Intent match(String raw) {
@@ -51,7 +49,14 @@ public class IntentMatcher {
             return new Intent("my_session_feedback", Map.of(),
                     "Fetching the ratings attendees have left on your sessions.");
         }
-        if (lower.contains("who") && lower.contains("attend")) {
+        boolean asksAboutAttendees = lower.contains("attend")
+                || lower.contains("signed up")
+                || lower.contains("signing up")
+                || lower.contains("registered for")
+                || lower.contains("is going to")
+                || lower.contains("are going to")
+                || lower.contains("attendee list");
+        if (lower.contains("who") && asksAboutAttendees) {
             String title = extractGroup(SESSION_TITLE_AFTER, prompt, "t");
             return new Intent("view_session_attendees",
                     title == null ? Map.of() : Map.of("session_query", title),
@@ -69,9 +74,10 @@ public class IntentMatcher {
                     "Cancelling. This is destructive and needs step-up auth.");
         }
         Matcher rate = RATING_INLINE.matcher(prompt);
-        if (rate.find() || lower.contains("rate")) {
+        boolean rateFound = rate.find();
+        if (rateFound || lower.contains("rate")) {
             int stars = 5;
-            if (rate.matches() || rate.find(0)) {
+            if (rateFound) {
                 try { stars = Integer.parseInt(rate.group("stars")); }
                 catch (Exception ignore) { /* default */ }
             }
@@ -91,18 +97,19 @@ public class IntentMatcher {
                     title == null ? Map.of() : Map.of("session_query", title),
                     "Bookmarking session.");
         }
-        if (lower.contains("speaker") || lower.startsWith("find ") || lower.contains("who is")) {
-            String name = lower.replaceAll(".*?(?:speaker|find|who is)\\s+", "").trim();
-            if (!name.isBlank()) {
-                return new Intent("find_speaker", Map.of("name", name),
-                        "Looking up speaker by name.");
-            }
+        boolean mentionsSession = lower.contains("session")
+                || lower.contains("talk")
+                || lower.contains("keynote")
+                || lower.contains("schedule")
+                || lower.contains("deep dive")
+                || lower.contains("workshop");
+        if (mentionsSession) {
+            String title = extractGroup(SESSION_TITLE_AFTER, prompt, "t");
+            Map<String, Object> args = title == null
+                    ? Map.of("query", prompt)
+                    : Map.of("query", title);
+            return new Intent("list_sessions", args, "Searching the schedule.");
         }
-        if (lower.contains("session") || lower.contains("talk") || lower.contains("schedule")) {
-            return new Intent("list_sessions", Map.of("query", prompt),
-                    "Searching the schedule.");
-        }
-
         return Intent.none();
     }
 

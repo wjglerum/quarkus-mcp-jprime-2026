@@ -3,20 +3,21 @@ package nl.lunatech.jprime.mcp.tools;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolCallException;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
-import nl.lunatech.jprime.mcp.api.Dtos.AttendeeBookmarkDto;
-import nl.lunatech.jprime.mcp.api.Dtos.CancelSessionRequest;
-import nl.lunatech.jprime.mcp.api.Dtos.SessionDto;
+import nl.lunatech.jprime.mcp.dto.AttendeeBookmarkDto;
+import nl.lunatech.jprime.mcp.dto.CancelSessionRequest;
+import nl.lunatech.jprime.mcp.dto.SessionDto;
 import nl.lunatech.jprime.mcp.api.MeConferenceApi;
-import nl.lunatech.jprime.mcp.security.McpSecurity;
+import nl.lunatech.jprime.mcp.security.StepUp;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import java.util.List;
 
 @ApplicationScoped
+@RolesAllowed("speaker")
 public class StepUpTools {
 
     @Inject
@@ -24,7 +25,7 @@ public class StepUpTools {
     MeConferenceApi me;
 
     @Inject
-    McpSecurity security;
+    StepUp stepUp;
 
     @Tool(name = "view_session_attendees",
             description = "As a speaker, see the list of attendees who bookmarked one of my sessions. "
@@ -35,7 +36,7 @@ public class StepUpTools {
     public List<AttendeeBookmarkDto> viewSessionAttendees(
             @ToolArg(name = "session_id", description = "Numeric session id", required = true)
             Long sessionId) {
-        security.requireStepUp();
+        stepUp.require();
         try (Response r = me.sessionAttendees(sessionId)) {
             if (r.getStatus() == 401) {
                 throw new ToolCallException(
@@ -46,13 +47,6 @@ public class StepUpTools {
                 throw new ToolCallException("backend_error: " + r.readEntity(String.class));
             }
             return r.readEntity(new jakarta.ws.rs.core.GenericType<List<AttendeeBookmarkDto>>() {});
-        } catch (WebApplicationException wae) {
-            if (wae.getResponse().getStatus() == 401) {
-                throw new ToolCallException(
-                        "insufficient_user_authentication: backend rejected the token. "
-                                + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver and retry.");
-            }
-            throw wae;
         }
     }
 
@@ -66,7 +60,7 @@ public class StepUpTools {
             Long sessionId,
             @ToolArg(name = "reason", description = "Free-text reason recorded in the audit log",
                     required = true) String reason) {
-        security.requireStepUp();
+        stepUp.require();
         return me.cancelSession(sessionId, new CancelSessionRequest(reason));
     }
 }

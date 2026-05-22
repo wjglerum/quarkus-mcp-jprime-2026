@@ -28,9 +28,9 @@
                 <scope>import</scope>
             </dependency>
             <dependency>
-                <groupId>${quarkus.platform.group-id}</groupId>
+                <groupId>io.quarkiverse.langchain4j</groupId>
                 <artifactId>quarkus-langchain4j-bom</artifactId>
-                <version>${quarkus.platform.version}</version>
+                <version>1.10.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -56,11 +56,11 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-jackson</artifactId>
+            <artifactId>quarkus-qute</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-oidc-token-propagation</artifactId>
+            <artifactId>quarkus-rest-qute</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.langchain4j</groupId>
@@ -68,11 +68,19 @@
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-oidc-mcp-auth-provider</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
             <artifactId>quarkus-langchain4j-anthropic</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-arc</artifactId>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-ollama</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -80,11 +88,23 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-        <groupId>io.rest-assured</groupId>
-        <artifactId>rest-assured</artifactId>
-        <scope>test</scope>
-    </dependency>
-</dependencies>
+            <groupId>io.quarkiverse.playwright</groupId>
+            <artifactId>quarkus-playwright</artifactId>
+            <version>2.3.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.26.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <build>
         <plugins>
@@ -105,7 +125,6 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
-                    <argLine>@{argLine}</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>

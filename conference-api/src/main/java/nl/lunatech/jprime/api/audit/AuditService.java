@@ -30,7 +30,8 @@ public class AuditService {
         event.attendeeSubject = resolveSubject();
         event.action = action;
         event.target = target;
-        event.tokenAcr = jwt == null ? null : jwt.getClaim("acr");
+        Object acr = jwt == null ? null : jwt.getClaim("acr");
+        event.tokenAcr = acr == null ? null : acr.toString();
         Object amr = jwt == null ? null : jwt.getClaim("amr");
         if (amr instanceof Iterable<?> it) {
             event.tokenAmr = StreamSupport.stream(it.spliterator(), false)

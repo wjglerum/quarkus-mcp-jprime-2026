@@ -17,16 +17,15 @@ public class Attendee extends PanacheEntity {
     @Column(name = "display_name", nullable = false)
     public String displayName;
 
-    public String email;
-
-    @Column(name = "is_speaker", nullable = false)
-    public boolean isSpeaker;
-
     @ManyToOne
     @JoinColumn(name = "speaker_id")
     public Speaker speaker;
 
     public static Attendee findBySubject(String subject) {
         return find("subject", subject).firstResult();
+    }
+
+    public boolean isSpeaker() {
+        return speaker != null;
     }
 }
