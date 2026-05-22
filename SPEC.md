@@ -430,43 +430,18 @@ A LangChain4j `AiService` with the MCP tool provider attached. System prompt is 
 - Token exchange is **not** enabled. No client uses service-account or direct-access grants.
 - Realm `frontendUrl` is **not** hardcoded. Dev Services maps Keycloak to a dynamic port; if `frontendUrl` is hardcoded, OIDC discovery breaks.
 
-Quarkus Dev Services boots Keycloak with this realm. All three apps configure the same `service-name=jprime-keycloak` **and the same `image-name=quay.io/keycloak/keycloak:26.5.7`** so they share a single container. Without the pinned image the apps default to whatever Keycloak version their Quarkus platform pins, and the conference-chat (whose `quarkus-langchain4j-bom` may pin a different Quarkus version than the other two) ends up on a different Keycloak version, so `shared=true` silently spawns two containers.
-
-### Building `keycloak-realm.json` from the Dev Services default
-
-The realm export is **derived from Dev Services' own default `quarkus` realm**, not hand-rolled. The default realm comes with the full canonical scope set (`basic`, `profile`, `email`, `roles`, `web-origins`, `acr`, `microprofile-jwt`, etc.) and the protocol mappers that emit `sub`, `preferred_username`, `name`, and `email`. Hand-rolling a realm and forgetting any of those mappers means access tokens come back missing `sub` and the audit pipeline silently writes `null` for `attendee_subject`.
-
-Procedure to (re)build the file:
-
-1. Temporarily comment out `quarkus.keycloak.devservices.realm-path` in conference-api's `application.properties` and set `quarkus.keycloak.devservices.realm-name=quarkus`. Start conference-api. Dev Services boots Keycloak with its own default realm.
-2. Use the Keycloak admin REST API (`admin` / `admin` on the master realm) to call `POST /admin/realms/quarkus/partial-export?exportClients=true&exportGroupsAndRoles=true`. Save the response.
-3. Transform the export to our needs: rename `realm` to `jprime`, strip composites from `default-roles-quarkus` and rename it to `default-roles-jprime` (the originals reference Keycloak-internal client roles you may or may not be bringing over), drop the `id` fields, keep all 14 default client scopes, replace the auto-created `conference-mcp` service-account client with our four real clients, replace users with `attendee1` / `willem.jan` / `admin-demo`, add the `attendee` and `speaker` scopes as **optional** scopes on each app client.
-4. Set realm-level defaults explicitly: `defaultDefaultClientScopes = [basic, profile, email, roles, web-origins, acr]` and `defaultOptionalClientScopes = [offline_access, microprofile-jwt, attendee, speaker]`.
-5. Save as `keycloak-realm.json` at the monorepo root. Restore the realm-path config.
-
-A repeatable Python script lives outside the repo (one-shot scaffolding tool). The output of step 5 is the canonical source.
-
-### Scope-config rules learned the hard way
-
-- **Do NOT set explicit `defaultClientScopes` on a client to just `["profile", "email"]`.** That overrides the realm-level defaults and strips `basic` along with it, which kills the `sub` claim mapper. Either include the full standard set or omit `defaultClientScopes` entirely so realm defaults apply.
-- **In Quarkus `quarkus.oidc.authentication.scopes`, only list the client's optional scopes.** Quarkus always prepends `openid`; the realm defaults (profile, email, basic, roles, web-origins, acr) are applied by Keycloak automatically. Listing `openid,profile,email,attendee,speaker` here causes Keycloak to reject the auth request with `Invalid scopes: openid openid profile email attendee speaker` (note the duplicated `openid` and the `profile`/`email` that are default-but-not-optional). The correct setting in `conference-chat/application.properties` is:
-  ```
-  quarkus.oidc.authentication.scopes=attendee,speaker
-  ```
-- **Realm `frontendUrl` must not be hardcoded.** Dev Services maps Keycloak to a random host port; a hardcoded `frontendUrl: http://localhost:8081` makes the realm emit token URLs that don't resolve.
-- **Imported `acr.loa.map` keys are ACR strings, values are integer levels.** `"urn:mace:incommon:iap:silver": "2"` is correct; the reverse blows up at first authentication with `Cannot deserialize value of type Integer from String`.
+Quarkus Dev Services boots Keycloak with this realm. All three apps configure the same `service-name=jprime-keycloak` and `shared=true` so they share a single container. Keep the three apps on the same Quarkus platform version (run `quarkus update` if drift creeps in); a mismatched Quarkus version is the only way `shared=true` ends up spawning two containers because each Quarkus release pins a different default Keycloak image.
 
 ### Single canonical realm file
 
-There is **exactly one `keycloak-realm.json`** in the repository, at the monorepo root: `./keycloak-realm.json`. The three apps reference it through a filesystem path:
+Exactly **one** `keycloak-realm.json` lives at the monorepo root. The three apps reference it through `quarkus.keycloak.devservices.realm-path=../keycloak-realm.json` (Dev Services resolves the path against each app's working directory). No app may copy the realm into its own `src/main/resources/`; edits land on the shared file.
 
-```
-quarkus.keycloak.devservices.realm-path=../keycloak-realm.json
-```
+The realm was derived from Dev Services' default `quarkus` realm so it ships the canonical client scopes (`basic`, `profile`, `email`, `roles`, `web-origins`, `acr`, `microprofile-jwt`) and the protocol mappers that emit `sub`, `preferred_username`, `name`, and `email`. A few gotchas worth keeping in mind when editing:
 
-Quarkus Dev Services resolves `realm-path` first as a classpath resource, then as a filesystem path; the leading `../` lands on the shared file regardless of which app's working directory triggered the boot.
-
-**No app may copy the realm file into its own `src/main/resources/`.** If a subagent needs a new client, role, or redirect URI, it edits the single shared file. The coordinator owns this file's lineage and reviews diffs from subagents before they land. This is non-negotiable: previous builds drifted into three out-of-sync copies and that path is closed.
+- Leave `defaultClientScopes` empty on each app client so the realm-level defaults apply; overriding with a short list strips `basic` and kills the `sub` claim.
+- `quarkus.oidc.authentication.scopes` lists only the client's *optional* scopes (eg `attendee,speaker`). Quarkus prepends `openid` and the realm-default scopes are added by Keycloak automatically.
+- Do not hardcode `frontendUrl`; Dev Services maps Keycloak to a random host port.
+- `acr.loa.map` keys are ACR strings, values are integer-as-string levels (`"urn:mace:incommon:iap:silver": "2"`).
 
 ### Quarkus security config
 
@@ -486,24 +461,7 @@ Quarkus Dev Services resolves `realm-path` first as a classpath resource, then a
 
 ### Reading JWT claims safely
 
-`JsonWebToken.getClaim(String)` has a generic return type `<T>` that the compiler infers from context. Passing the result straight into `String.valueOf(...)` makes the compiler pick `String.valueOf(char[])` because it is more specific than `String.valueOf(Object)`, and the runtime ClassCastException ("class java.lang.String cannot be cast to class [C") is incomprehensible the first time you see it.
-
-Two rules:
-
-1. Never call `String.valueOf(jwt.getClaim(name))`. Either assign to an explicitly typed local first (`Object raw = jwt.getClaim(name); String s = String.valueOf(raw);`) or use a type witness (`jwt.<String>getClaim(name)`).
-2. Prefer the `Optional`-returning `JsonWebToken.<Object>claim(name)` over `getClaim`. Wrap that in a tiny app-local helper:
-
-   ```java
-   public final class JwtClaims {
-       public static String string(JsonWebToken jwt, String name, String orElse) {
-           return jwt.<Object>claim(name).map(Object::toString)
-                   .filter(s -> !s.isBlank()).orElse(orElse);
-       }
-       public static List<String> stringList(JsonWebToken jwt, String name) { /* ... */ }
-   }
-   ```
-
-   The helper lives at `conference-chat/src/main/java/nl/lunatech/jprime/chat/security/JwtClaims.java`. `ChatPageResource` and `ChatResource` both use it for `acr` and `amr`. The conference-api / conference-mcp apps read claims via `SecurityIdentity.getPrincipal().getName()` and `JsonWebToken.getSubject()` directly, so they don't need the helper. Add it there too if you ever start formatting raw claims for display.
+`JsonWebToken.getClaim(name)` returns a generic `<T>` that the compiler infers from context, which makes `String.valueOf(jwt.getClaim(name))` resolve to `String.valueOf(char[])` and blow up at runtime. Always assign the result to an explicit `Object` first, or use the `JwtClaims` helper at `conference-chat/src/main/java/nl/lunatech/jprime/chat/security/JwtClaims.java` which wraps the `Optional`-returning `claim()` overload.
 
 ### Required ACR check
 
@@ -578,30 +536,8 @@ Talking points: step-up is the spec-level answer to "OAuth is for humans". Same 
 
 - **Java**: 25 (or the most-current LTS Quarkus 3.x supports cleanly; confirm with the latest Quarkus release before scaffolding).
 - **Quarkus**: 3.x latest stable. Use the platform BOM (`io.quarkus.platform:quarkus-bom`) for everything Quarkus-managed.
-- **Standalone Quarkiverse BOMs, not platform-aligned ones**: both conference-chat (langchain4j) and conference-mcp (mcp-server) import directly from the Quarkiverse, not from `io.quarkus.platform`. The platform BOMs lag the standalone releases (eg the platform `quarkus-langchain4j-bom:3.35.4` pinned `quarkus-langchain4j-*` to 1.9.2 while the standalone was already on 1.10.0). Bump these BOMs independently of Quarkus core:
-  ```xml
-  <!-- conference-chat -->
-  <dependency>
-      <groupId>io.quarkiverse.langchain4j</groupId>
-      <artifactId>quarkus-langchain4j-bom</artifactId>
-      <version>1.10.0</version>
-      <type>pom</type>
-      <scope>import</scope>
-  </dependency>
-
-  <!-- conference-mcp -->
-  <dependency>
-      <groupId>io.quarkiverse.mcp</groupId>
-      <artifactId>quarkus-mcp-server-bom</artifactId>
-      <version>1.12.1</version>
-      <type>pom</type>
-      <scope>import</scope>
-  </dependency>
-  ```
-  Keep the Quarkus core platform BOM imported in the same `dependencyManagement`; the two are complementary.
-
-- **MCP server artifact rename**: in `quarkus-mcp-server` 1.12.x, `quarkus-mcp-server-sse` was relocated to **`quarkus-mcp-server-http`** (HTTP transports consolidated). Use the new name in `conference-mcp/pom.xml`; the SSE endpoint stays at `/mcp/sse`.
-- **Build**: Maven.
+- **Standalone Quarkiverse BOMs**: conference-chat imports `io.quarkiverse.langchain4j:quarkus-langchain4j-bom` and conference-mcp imports `io.quarkiverse.mcp:quarkus-mcp-server-bom` directly from the Quarkiverse alongside the Quarkus core platform BOM. The platform BOMs lag the standalone releases, so bump these two independently of Quarkus core.
+- **Build**: Maven. A thin aggregator pom at the monorepo root lets `./mvnw verify` build all three apps in one reactor pass; each child pom stays self-contained on its own BOMs.
 - **Tests**: JUnit 5, REST Assured, Quarkus Dev Services (Testcontainers for Postgres, Keycloak Dev Services for OIDC). Tests disable OIDC with `%test.quarkus.oidc.tenant-enabled=false` so they use `@TestSecurity`.
 - **Code style**: no em dashes in any generated text, comments, or documentation.
 - **DTOs**: each REST/MCP DTO is a **top-level class (or record) in its own file**, inside a dedicated `dto` package per app:
@@ -745,130 +681,25 @@ Two GitHub-side files under `.github/` are mandatory.
 
 - **`.github/dependabot.yml`**: weekly updates. One Maven block covers all three apps via the `directories:` (plural) field, plus one block for GitHub Actions at the repo root. No artifact group filters; let Dependabot update everything it sees.
 
-## Development tooling: Quarkus Agent and skills
+## Development tooling: Quarkus Agent
 
-All work on this repo (initial build, rebuilds, polish passes) happens through the **Quarkus Agent MCP** plugin. It is the source of truth for how to scaffold, run, and reason about Quarkus apps in this monorepo. Every subagent and the coordinator MUST use it; do not run `mvn quarkus:dev` or `mvn` directly when an equivalent Quarkus Agent tool exists.
+Work on this repo runs through the **Quarkus Agent MCP** plugin. Use `quarkus_start` / `quarkus_stop` / `quarkus_status` / `quarkus_logs` to manage dev mode (never `pkill` or backgrounded `mvn quarkus:dev`), `quarkus_update` to check that a module is on the latest Quarkus release, `quarkus_skills` before writing code that touches a Quarkus extension, and `quarkus_searchDocs` instead of generic web search. After pom changes, do a full `quarkus_stop` + `quarkus_start` so dependencies re-resolve.
 
-The agent's key tools (invoked as `quarkus_*` MCP calls):
+When `quarkus_update` proposes recipe steps, reject only the swaps from our standalone Quarkiverse BOMs to the platform-aligned ones (`quarkus-langchain4j-bom`, `quarkus-mcp-server-bom`); the platform variants lag. Bump those two BOMs independently as new minors ship.
 
-- `quarkus_create` -- scaffold a new Quarkus app with the chosen extensions. Used once per module (already done for the three apps in this repo).
-- `quarkus_update` -- check whether a module is on the latest Quarkus release and run the upgrade dry-run.
-- `quarkus_start` / `quarkus_stop` / `quarkus_status` / `quarkus_restart` -- manage dev-mode lifecycle without leaving a Maven process attached to the agent's terminal.
-- `quarkus_logs` -- pull the most recent Quarkus log lines for a managed app.
-- `quarkus_skills` -- **mandatory before writing or editing any extension-specific code.** Returns extension-specific patterns, testing guidance, and pitfalls. Skills exist for `quarkus-arc`, `quarkus-hibernate-orm-panache`, `quarkus-oidc`, `quarkus-rest`, `quarkus-smallrye-openapi`, `quarkus-security`, etc.
-- `quarkus_searchDocs` -- prefer this over generic web search for any Quarkus question; it is version-aware.
-- `quarkus_searchTools` + `quarkus_callTool` -- list and invoke the Dev MCP tools the running app exposes (testing, configuration, OpenAPI schema retrieval, scheduler jobs). The tool list is dynamic per extension set, so re-list after adding or removing an extension.
-
-### Mandatory workflow steps for every subagent
-
-1. Manage app lifecycles with `quarkus_start` / `quarkus_stop` / `quarkus_restart` / `quarkus_status` / `quarkus_list`. Never `pkill`, never `mvn quarkus:dev &`. The Quarkus Agent owns the dev process and its log file; killing it out from under the agent leaves zombie listeners on ports 8080-8082 and breaks subsequent starts.
-2. Call `quarkus_update` (via a subagent or directly) when returning to a module. Acts as a sanity check that the module is on the expected Quarkus version. **This is the ONLY supported way to check for updates** -- do not curl Maven Central or eyeball BOM versions by hand.
-
-   `quarkus_update` reports the current vs latest Quarkus platform version and runs `quarkus update --dry-run` to produce a patch. **Apply the patch.** It correctly handles artifact renames the team performs over time, including `quarkus-junit5` -> `quarkus-junit`. The only recipe steps to **reject** are:
-   - Swapping our standalone `io.quarkiverse.langchain4j:quarkus-langchain4j-bom` for the platform-aligned `io.quarkus.platform:quarkus-langchain4j-bom`. The platform variant lags releases. See "Standalone Quarkiverse BOMs" above.
-   - Swapping `io.quarkiverse.mcp:quarkus-mcp-server-bom` for the platform-aligned variant for the same reason.
-
-   When the Quarkiverse extensions themselves ship a new minor (eg `quarkus-langchain4j-bom` 1.10.0 -> 1.11.0, `quarkus-mcp-server-bom` 1.12.1 -> 1.13.0), bump the version literal in the relevant pom and restart dev mode. There is no platform release to wait for.
-2. Call `quarkus_skills` before writing code for an extension. Skipping this is a violation; the skills file documents the right pattern and prevents the obvious mistakes.
-3. Use `quarkus_searchDocs` instead of generic doc search.
-4. Run tests via `quarkus_callTool` with `devui-testing_runTests` (or `devui-testing_runTest` for a single class). Do not run `mvn test` directly when the Dev MCP testing tool is available.
-5. After pom.xml or build.gradle changes, **full `quarkus_stop` + `quarkus_start`**. A force-restart only recompiles source files; it does not re-resolve dependencies.
-
-### Per-project skills
-
-Per-project agent guidance lives under `<app>/.quarkus/skills/<extension-name>/SKILL.md`. Use these to override or enhance the JAR-bundled skill content with project-specific decisions. Layer order (each enhances or overrides the previous):
-
-1. JAR defaults (built into the extension).
-2. Global `~/.quarkus/skills/<extension-name>/SKILL.md`.
-3. Project `<app>/.quarkus/skills/<extension-name>/SKILL.md`.
-
-Examples to keep in mind when this monorepo gets larger:
-
-- `conference-api/.quarkus/skills/quarkus-hibernate-orm-panache/SKILL.md` documenting the "no Flyway, drop-and-create, one Session entity, one Speaker FK per Session" rule.
-- `conference-mcp/.quarkus/skills/quarkus-mcp-server-http/SKILL.md` documenting "use `@RolesAllowed` on tool methods; use the `StepUp.require()` helper for acr checks; throw `ToolCallException` with `insufficient_user_authentication:` prefix".
-- `conference-chat/.quarkus/skills/quarkus-langchain4j-mcp/SKILL.md` documenting "MCP tool calls always go through the `ToolProvider` resolved by the registered provider; never call conference-api REST clients directly from the chat backend".
-
-Skills are optional during the first build, but every subagent must read the relevant SKILL files (JAR or local) via `quarkus_skills` before touching extension-specific code.
-
-### `AGENTS.md` per app
-
-Each scaffolded Quarkus app already ships an `AGENTS.md` (and a `CLAUDE.md` pointer to it) generated by `quarkus_create`. Keep it. It enforces:
-
-- The extension-first rule (no hand-rolled features when a Quarkus extension fits).
-- The "load skills before writing code" rule.
-- Test discipline (`@QuarkusTest`, Dev Services for backing services, no `-DskipTests`).
-- README maintenance after every change.
-
-If an `AGENTS.md` directive conflicts with this SPEC.md, **SPEC.md wins** for the demo's particulars (sequential ports, single shared realm, no Flyway, no DEMO_RESET.sh, etc.). Flag any conflict and update SPEC.md instead of silently diverging.
+Each scaffolded app ships an `AGENTS.md` (with a `CLAUDE.md` pointer) that enforces the extension-first rule, the "load skills before writing code" rule, and test discipline. SPEC.md wins on conflicts about the demo's particulars (sequential ports, single shared realm, no Flyway, no DEMO_RESET.sh).
 
 ---
 
-## Build process: one subagent per app
+## Acceptance
 
-The three apps are independent enough that they should be built by **three separate subagents** working in parallel, with a fourth coordinator pass at the end to wire them together. This keeps the main agent's context lean and makes each piece independently verifiable.
+The demo is ready for the stage when, from the monorepo root, `./mvnw verify` is green and the three apps boot with `./mvnw quarkus:dev` in their own directories:
 
-### Subagent assignments
+- **conference-api** on port 8080: `GET /api/v1/sessions` returns the seeded schedule, `GET /audit-live/` serves the dashboard, `GET /q/health/ready` is UP.
+- **conference-mcp** on port 8081: `GET /q/health/ready` is UP (and its check confirms conference-api is reachable), `GET /mcp/sse` accepts an SSE connection.
+- **conference-chat** on port 8082: `GET /` redirects to Keycloak, `GET /api/chat/quick-prompts` returns 401 anonymously and 200 with a session, `GET /q/health/ready` reports the MCP tool listing succeeded.
 
-1. **`conference-api` subagent**: data model, Flyway migrations, REST endpoints, seeders, importer, audit-live dashboard, integration tests.
-2. **`conference-mcp` subagent**: MCP tools, security checks, REST clients with token propagation, health checks, wiring tests.
-3. **`conference-chat` subagent**: OIDC web-app, LangChain4j MCP client, provider registry, intent matcher, chat SPA, wiring tests.
-4. **Coordinator pass** (main agent or a fourth subagent): Keycloak realm export with all four clients (the three apps plus `mcp-clients`), shared Dev Services config, RUNBOOK, top-level README.
-
-Each subagent must be briefed with this SPEC.md and a short pointer to its app subtree. The subagent owns everything under `<app>/` and the corresponding section of the realm export.
-
-### Definition of done (per subagent)
-
-A subagent's work is **only complete** when both of the following pass for its app, in this order:
-
-1. **`./mvnw test` is green.** All tests pass, no errors, no flaky skips. Failure summaries go back to the subagent for one fix-and-verify cycle before escalating.
-2. **`./mvnw quarkus:dev` boots and responds.** The subagent starts the app in dev mode (or asks the harness to via `quarkus_start`), waits for the "started in Ns" log line, and then hits the app's primary endpoints with curl to confirm a 2xx or expected 4xx:
-   - conference-api (port 8080): `GET /api/v1/sessions` returns the seeded schedule; `GET /audit-live/` returns the dashboard HTML; `GET /q/health/ready` is UP.
-   - conference-mcp (port 8081): `GET /q/health/ready` is UP and its check confirms conference-api is reachable; `GET /mcp/sse` accepts an SSE connection.
-   - conference-chat (port 8082): `GET /` redirects to Keycloak (302), `GET /api/chat/quick-prompts` returns 401 without a session and 200 with one, `GET /q/health/ready` reports that MCP tool listing succeeded.
-
-Subagents should report back with:
-- The test summary (test counts per class, any failures).
-- The dev-mode smoke output (which endpoints returned what).
-- Any deviations from the spec, with a one-line justification each.
-
-A subagent that cannot get both green flags must surface the blocker rather than silently mark the work done. Do not skip tests or hide failures behind `-DskipTests`.
-
-### Coordination
-
-- Subagents run in parallel but **only the coordinator edits `./keycloak-realm.json`**. There is exactly one realm file at the monorepo root; no per-app copies. A subagent that needs a new client / role / redirect URI submits the diff to the coordinator rather than editing in isolation.
-- Shared Dev Services `service-name=jprime-keycloak` and `shared=true` are mandatory so only one Keycloak container boots.
-- When all three subagents declare done, the coordinator does an integration pass:
-  - Start all three apps with `quarkus_start`.
-  - Drive each demo flow manually (or via curl scripts) against the running stack.
-  - Confirm `/audit-live/` updates within 2 seconds of each tool call.
-  - Confirm the chat client can switch LLM providers without restart.
-
-## What Claude Code should produce
-
-1. **Three Quarkus apps** as Maven projects, all buildable with `./mvnw quarkus:dev`.
-2. **No `docker compose`** anywhere. All infra via Quarkus Dev Services. Shared Keycloak container across all three apps via `service-name=jprime-keycloak`.
-3. **One** Keycloak realm export at the monorepo root (`./keycloak-realm.json`), referenced by all three apps via `../keycloak-realm.json`. Includes the `conference-chat` confidential client with PKCE S256.
-4. **Schedule importer + SQL/Java seed** as described above. Static schedule must include sessions co-located with Willem Jan as a speaker.
-5. **Full REST API** in conference-api with OpenAPI annotations, plus the `/audit-live/` second-screen dashboard.
-6. **MCP tools** in conference-mcp with LLM-tuned descriptions, standard `@RolesAllowed` annotations, and the `StepUp.require()` helper on the two step-up tools.
-7. **conference-chat** app:
-   - OIDC web-app login with PKCE S256.
-   - LangChain4j MCP client to conference-mcp (real MCP wire, no shortcuts to conference-api).
-   - Provider registry with at minimum `anthropic`, `openai`, `ollama` configured.
-   - Scripted intent matcher as the default mode.
-   - Chat SPA matching the deck palette and typography.
-   - Quick-prompt sidebar covering all three demos.
-   - Mode toggle (Scripted / LLM) plus a provider dropdown.
-8. **Health checks** on every app. conference-mcp's readiness verifies it can reach conference-api. conference-chat's readiness verifies it can list MCP tools.
-9. **Integration tests** for conference-api endpoints with `@QuarkusTest` and `@TestSecurity`. Smoke test for conference-mcp wiring. Smoke test for conference-chat (intent matcher unit tests plus a wiring test).
-10. **READMEs** per app and a top-level `RUNBOOK.md` with the exact demo steps and env vars.
-11. No demo-reset script. Restart `conference-api` (or remove the Dev Services Postgres container) for a clean slate.
-
-## Open questions
-
-1. The latest MCP authorization spec details for step-up challenges: confirm the exact wire format Quarkus MCP server emits once the upstream test lands. Default to following Quarkus' lead.
-2. Whether to ship a Bedrock provider in the default build. Currently optional, off by default.
-3. Whether to stream LLM responses into the assistant bubble. Currently sync; streaming is a nice-to-have.
+Single shared Keycloak realm at `./keycloak-realm.json` with the four clients (`conference-api`, `conference-mcp`, `conference-chat`, `mcp-clients`) and three users (`attendee1`, `willem.jan`, `admin-demo`). PKCE S256 on every confidential client. Health checks, READMEs per app, and a top-level `RUNBOOK.md` with the demo flow.
 
 ## Visual reference (deck to UI mapping)
 
@@ -991,14 +822,10 @@ A subagent or polish pass that diverges from any of the above must justify the d
 
 ## Operational notes (lessons from rehearsals)
 
-A short list of things that bit us during the build. Documented so a fresh agent does not retrace the debugging.
-
-- **Pin the Keycloak image** across all three apps (`quarkus.keycloak.devservices.image-name=quay.io/keycloak/keycloak:26.5.7`). Without this, Quarkus 3.27.x apps default to Keycloak 26.3.4 and Quarkus 3.35.4 apps default to 26.5.7, and `shared=true` silently spawns two containers.
-- **All three apps on the same Quarkus version.** Mixed Quarkus platforms (eg 3.27 from a stale langchain4j BOM vs 3.35 from the platform BOM) cause subtle wiring drift. `quarkus_update` catches this.
+- **All three apps on the same Quarkus version.** Mixed platforms cause subtle wiring drift, including silently spawning two Keycloak containers because each Quarkus release ships a different default Keycloak image. Run `quarkus update` if drift creeps in.
 - **Restart the apps after rebuilding the realm.** OIDC caches the issuer URL on first discovery; if Keycloak comes back on a different port, the running apps return 401 on every token until restarted.
 - **Pin `demo.now`** in dev so the rating cutoff and `whats_on_now` are deterministic. Without it, the wall clock reads "today" and every seeded 2026-06-03 session looks future-dated, so `rate_session` returns 422 `session_not_started`.
 - **No code comments explaining "why we did X"**. The rationale belongs in this spec or in a commit message, not in the source. Keep code comments to the minimum needed to read the code in isolation. Avoid javadoc that recapitulates what the method signature already says.
-- **No artifact ids in code comments**. We re-renamed `quarkus-mcp-server-sse` to `quarkus-mcp-server-http`; the pom is the source of truth, the spec documents the rename, no comment needed in the pom block.
 
 ## Out of scope
 
