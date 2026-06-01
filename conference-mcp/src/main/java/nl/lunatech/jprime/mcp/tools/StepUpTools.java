@@ -6,11 +6,12 @@ import io.quarkiverse.mcp.server.ToolCallException;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.Response;
+import nl.lunatech.jprime.mcp.api.MeConferenceApi;
 import nl.lunatech.jprime.mcp.dto.AttendeeBookmarkDto;
 import nl.lunatech.jprime.mcp.dto.CancelSessionRequest;
 import nl.lunatech.jprime.mcp.dto.SessionDto;
-import nl.lunatech.jprime.mcp.api.MeConferenceApi;
 import nl.lunatech.jprime.mcp.security.StepUp;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
@@ -28,37 +29,45 @@ public class StepUpTools {
     StepUp stepUp;
 
     @Tool(name = "view_session_attendees",
-            description = "As a speaker, see the list of attendees who bookmarked one of my sessions. "
-                    + "This contains personal data (names and emails) and requires recent MFA-backed "
-                    + "authentication (step-up). If the current token's acr is insufficient, the "
-                    + "server returns an insufficient_user_authentication error and the client should "
-                    + "re-authenticate with a higher acr_values request.")
+            description = "List the attendees (display names) who bookmarked one of the "
+                    + "authenticated speaker's sessions. This exposes personal data and requires "
+                    + "recent MFA-backed authentication, also known as step-up. If the current "
+                    + "token does not satisfy the acr requirement, the tool returns an "
+                    + "`insufficient_user_authentication` error; the client must then "
+                    + "re-authenticate with `acr_values=urn:mace:incommon:iap:silver` and retry. "
+                    + "Tell the user that signing in again with a one-time code is needed.")
     public List<AttendeeBookmarkDto> viewSessionAttendees(
-            @ToolArg(name = "session_id", description = "Numeric session id", required = true)
-            Long sessionId) {
+            @ToolArg(name = "session_id",
+                    description = "Numeric session id owned by the authenticated speaker.",
+                    required = true) Long sessionId) {
         stepUp.require();
         try (Response r = me.sessionAttendees(sessionId)) {
             if (r.getStatus() == 401) {
                 throw new ToolCallException(
                         "insufficient_user_authentication: backend requires step-up. "
-                                + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver and retry.");
+                                + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver "
+                                + "and retry.");
             }
             if (r.getStatus() >= 400) {
                 throw new ToolCallException("backend_error: " + r.readEntity(String.class));
             }
-            return r.readEntity(new jakarta.ws.rs.core.GenericType<List<AttendeeBookmarkDto>>() {});
+            return r.readEntity(new GenericType<List<AttendeeBookmarkDto>>() {});
         }
     }
 
     @Tool(name = "cancel_my_session",
-            description = "As a speaker, mark one of my own sessions as cancelled (with a reason). "
-                    + "Highly destructive but reversible by calling this tool again with the same "
-                    + "session id. The action is fully audited. Requires recent MFA-backed "
-                    + "authentication (step-up).")
+            description = "Mark one of the authenticated speaker's own sessions as cancelled, with "
+                    + "a recorded reason. Reversible: calling the tool again with the same session "
+                    + "id toggles the cancellation off and records `CANCEL_SESSION_UNDONE`. Highly "
+                    + "destructive in intent, so it requires recent MFA-backed authentication "
+                    + "(step-up). Tell the user this action is fully audited and visible on the "
+                    + "live audit feed.")
     public SessionDto cancelMySession(
-            @ToolArg(name = "session_id", description = "Numeric session id", required = true)
-            Long sessionId,
-            @ToolArg(name = "reason", description = "Free-text reason recorded in the audit log",
+            @ToolArg(name = "session_id",
+                    description = "Numeric session id owned by the authenticated speaker.",
+                    required = true) Long sessionId,
+            @ToolArg(name = "reason",
+                    description = "Free-text reason recorded in the audit log.",
                     required = true) String reason) {
         stepUp.require();
         return me.cancelSession(sessionId, new CancelSessionRequest(reason));

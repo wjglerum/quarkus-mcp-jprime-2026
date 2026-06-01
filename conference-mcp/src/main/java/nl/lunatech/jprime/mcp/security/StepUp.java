@@ -13,13 +13,17 @@ public class StepUp {
 
     public void require() {
         Object acr = jwt.getClaim("acr");
-        if ("2".equals(String.valueOf(acr))
-                || "urn:mace:incommon:iap:silver".equals(String.valueOf(acr))) return;
+        String acrStr = String.valueOf(acr);
+        if ("urn:mace:incommon:iap:silver".equals(acrStr) || "2".equals(acrStr)) {
+            return;
+        }
         Object amr = jwt.getClaim("amr");
-        if (amr instanceof Iterable<?> it) {
-            for (Object o : it) {
-                String s = String.valueOf(o);
-                if ("mfa".equals(s) || "otp".equals(s)) return;
+        if (amr instanceof Iterable<?> values) {
+            for (Object value : values) {
+                String s = String.valueOf(value);
+                if ("mfa".equals(s) || "otp".equals(s)) {
+                    return;
+                }
             }
         }
         throw new ToolCallException(

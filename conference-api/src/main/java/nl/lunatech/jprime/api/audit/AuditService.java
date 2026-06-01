@@ -31,14 +31,14 @@ public class AuditService {
         event.action = action;
         event.target = target;
         Object acr = jwt == null ? null : jwt.getClaim("acr");
-        event.tokenAcr = acr == null ? null : acr.toString();
+        event.tokenAcr = acr == null ? null : String.valueOf(acr);
         Object amr = jwt == null ? null : jwt.getClaim("amr");
         if (amr instanceof Iterable<?> it) {
             event.tokenAmr = StreamSupport.stream(it.spliterator(), false)
                     .map(String::valueOf)
                     .collect(Collectors.joining(","));
         } else if (amr != null) {
-            event.tokenAmr = amr.toString();
+            event.tokenAmr = String.valueOf(amr);
         }
         event.createdAt = clock.now();
         event.detail = detail;

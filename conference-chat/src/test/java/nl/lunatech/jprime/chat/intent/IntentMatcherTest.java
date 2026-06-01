@@ -8,10 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Unit tests for the scripted IntentMatcher. The matcher is the demo's safety
- * net so each quick prompt must map to the right MCP tool deterministically.
- */
 class IntentMatcherTest {
 
     private final IntentMatcher matcher = new IntentMatcher();
@@ -97,6 +93,7 @@ class IntentMatcherTest {
         assertTrue(i.matched());
         assertEquals("cancel_my_session", i.tool());
         assertNotNull(i.args().get("reason"));
+        assertEquals("deep dive", i.args().get("session_query"));
     }
 
     @Test

@@ -63,13 +63,13 @@ public class IntentMatcher {
                     "Asking for the attendee list. This is sensitive and needs step-up auth.");
         }
         if (lower.startsWith("cancel ") || lower.contains("cancel my ") || lower.contains("kill my session")) {
-            String title = extractGroup(SESSION_TITLE_AFTER, prompt, "t");
             String reason = extractGroup(Pattern.compile(
                     "(?:because|reason\\s+is|the reason is|since)\\s+(?<r>.+)$",
                     Pattern.CASE_INSENSITIVE), prompt, "r");
+            String subject = cancelSubject(prompt);
             return new Intent("cancel_my_session",
                     Map.of(
-                            "session_query", title == null ? "" : title,
+                            "session_query", subject,
                             "reason", reason == null ? "demo cancellation" : reason),
                     "Cancelling. This is destructive and needs step-up auth.");
         }
@@ -129,6 +129,15 @@ public class IntentMatcher {
                 new QuickPrompt("Cancel my deep dive, reason is I want to go home early",
                         "cancel_my_session", "step-up")
         );
+    }
+
+    private static String cancelSubject(String prompt) {
+        String subject = prompt.replaceFirst("(?i)^.*?\\bcancel\\s+", "");
+        subject = subject.replaceFirst(
+                "(?i)[,\\s]*(?:because|reason\\s+is|the reason is|since)\\b.*$", "");
+        subject = subject.replaceFirst("(?i)^(?:my|the)\\s+", "");
+        subject = subject.replaceAll("[\\s,?.!]+$", "").trim();
+        return subject.isEmpty() ? "deep dive" : subject;
     }
 
     private static String extractGroup(Pattern p, String input, String group) {

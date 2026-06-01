@@ -37,7 +37,7 @@ public class ProviderRegistry {
     @ModelName("llama")
     Instance<ChatModel> ollamaChat;
 
-    @ConfigProperty(name = "chat.llm.initial-provider", defaultValue = SCRIPTED)
+    @ConfigProperty(name = "chat.llm.provider", defaultValue = SCRIPTED)
     String initialProvider;
 
     @ConfigProperty(name = "quarkus.langchain4j.anthropic.claude.api-key", defaultValue = "not-set")

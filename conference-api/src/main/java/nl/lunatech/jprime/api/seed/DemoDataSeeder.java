@@ -69,26 +69,27 @@ public class DemoDataSeeder {
         Random rnd = new Random(42);
 
         int bookmarks = 0;
-        for (Attendee a : attendees) {
-            int n = 1 + rnd.nextInt(2);
-            for (int i = 0; i < n; i++) {
-                Session s = sessions.get(rnd.nextInt(sessions.size()));
-                if (Bookmark.findOne(a.id, s.id) != null) continue;
-                Bookmark b = new Bookmark();
-                b.attendee = a;
-                b.session = s;
-                b.createdAt = OffsetDateTime.parse("2026-06-01T09:00:00+03:00").plusMinutes(bookmarks);
-                b.persist();
-                bookmarks++;
+        if (!sessions.isEmpty()) {
+            for (Attendee a : attendees) {
+                int n = 1 + rnd.nextInt(2);
+                for (int i = 0; i < n; i++) {
+                    Session s = sessions.get(rnd.nextInt(sessions.size()));
+                    if (Bookmark.findOne(a.id, s.id) != null) continue;
+                    Bookmark b = new Bookmark();
+                    b.attendee = a;
+                    b.session = s;
+                    b.createdAt = OffsetDateTime.parse("2026-06-01T09:00:00+03:00").plusMinutes(bookmarks);
+                    b.persist();
+                    bookmarks++;
+                }
             }
         }
 
         if (willemJan != null) {
             List<Session> mine = Session.list("speaker.id", willemJan.id);
             for (Session s : mine) {
-                for (int i = 0; i < 3 && i < attendees.size(); i++) {
+                for (int i = 0; i < 3 && i + 1 < attendees.size(); i++) {
                     Attendee a = attendees.get(i + 1);
-                    if (a == null) continue;
                     if (Bookmark.findOne(a.id, s.id) != null) continue;
                     Bookmark b = new Bookmark();
                     b.attendee = a;
@@ -101,18 +102,20 @@ public class DemoDataSeeder {
         }
 
         int ratings = 0;
-        for (int i = 0; i < 25 && ratings < 25; i++) {
-            Attendee a = attendees.get(rnd.nextInt(attendees.size()));
-            Session s = sessions.get(rnd.nextInt(sessions.size()));
-            if (Rating.findOne(a.id, s.id) != null) continue;
-            Rating r = new Rating();
-            r.attendee = a;
-            r.session = s;
-            r.stars = 2 + rnd.nextInt(4);
-            r.comment = NICE_COMMENTS.get(rnd.nextInt(NICE_COMMENTS.size()));
-            r.createdAt = OffsetDateTime.parse("2026-06-03T11:00:00+03:00").plusMinutes(ratings);
-            r.persist();
-            ratings++;
+        if (!sessions.isEmpty()) {
+            for (int i = 0; i < 50 && ratings < 25; i++) {
+                Attendee a = attendees.get(rnd.nextInt(attendees.size()));
+                Session s = sessions.get(rnd.nextInt(sessions.size()));
+                if (Rating.findOne(a.id, s.id) != null) continue;
+                Rating r = new Rating();
+                r.attendee = a;
+                r.session = s;
+                r.stars = 2 + rnd.nextInt(4);
+                r.comment = NICE_COMMENTS.get(rnd.nextInt(NICE_COMMENTS.size()));
+                r.createdAt = OffsetDateTime.parse("2026-06-03T11:00:00+03:00").plusMinutes(ratings);
+                r.persist();
+                ratings++;
+            }
         }
 
         int wjgRatings = 0;

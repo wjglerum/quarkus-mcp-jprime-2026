@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.notNullValue;
 
 @QuarkusTest
@@ -22,6 +24,7 @@ class StepUpTest {
 
     @Test
     @TestSecurity(user = "willem.jan", roles = {"attendee", "speaker"})
+    @OidcSecurity(claims = {@Claim(key = "sub", value = "willem.jan")})
     void attendeesEndpointRequiresStepUp() {
         int id = wjgSessionId();
         given().when().get("/api/v1/sessions/" + id + "/attendees")
@@ -31,7 +34,10 @@ class StepUpTest {
 
     @Test
     @TestSecurity(user = "willem.jan", roles = {"attendee", "speaker"})
-    @OidcSecurity(claims = {@Claim(key = "acr", value = "urn:mace:incommon:iap:silver")})
+    @OidcSecurity(claims = {
+            @Claim(key = "sub", value = "willem.jan"),
+            @Claim(key = "acr", value = "urn:mace:incommon:iap:silver")
+    })
     void attendeesEndpointAllowsAfterStepUp() {
         int id = wjgSessionId();
         given().when().get("/api/v1/sessions/" + id + "/attendees")
@@ -49,18 +55,27 @@ class StepUpTest {
 
     @Test
     @TestSecurity(user = "willem.jan", roles = {"attendee", "speaker"})
-    @OidcSecurity(claims = {@Claim(key = "acr", value = "urn:mace:incommon:iap:silver")})
-    void cancelSessionIsReversible() {
+    @OidcSecurity(claims = {
+            @Claim(key = "sub", value = "willem.jan"),
+            @Claim(key = "acr", value = "urn:mace:incommon:iap:silver")
+    })
+    void cancelSessionIsReversibleAndAuditsBothDirections() {
         int id = wjgSessionId();
         given().contentType("application/json")
                 .body("{\"reason\":\"going home early\"}")
                 .when().post("/api/v1/sessions/" + id + "/cancel")
                 .then().statusCode(200)
-                .body("cancelled", org.hamcrest.Matchers.equalTo(true));
+                .body("cancelled", equalTo(true));
         given().contentType("application/json")
                 .body("{\"reason\":\"changed mind\"}")
                 .when().post("/api/v1/sessions/" + id + "/cancel")
                 .then().statusCode(200)
-                .body("cancelled", org.hamcrest.Matchers.equalTo(false));
+                .body("cancelled", equalTo(false));
+
+        given().queryParam("limit", 30)
+                .when().get("/api/v1/audit/recent")
+                .then().statusCode(200)
+                .body("action", hasItem("CANCEL_SESSION"))
+                .body("action", hasItem("CANCEL_SESSION_UNDONE"));
     }
 }

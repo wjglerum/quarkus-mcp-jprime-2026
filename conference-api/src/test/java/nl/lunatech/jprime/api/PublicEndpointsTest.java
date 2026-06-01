@@ -4,8 +4,10 @@ import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.notNullValue;
 
 @QuarkusTest
@@ -26,7 +28,7 @@ class PublicEndpointsTest {
                 .when().get("/api/v1/sessions")
                 .then().statusCode(200)
                 .body("size()", greaterThan(0))
-                .body("title[0]", org.hamcrest.Matchers.containsString("Concurrency Crossroads"));
+                .body("title[0]", containsString("Concurrency Crossroads"));
     }
 
     @Test
@@ -68,7 +70,7 @@ class PublicEndpointsTest {
                 .queryParam("limit", 2)
                 .when().get("/api/v1/sessions/next")
                 .then().statusCode(200)
-                .body("size()", org.hamcrest.Matchers.lessThanOrEqualTo(2));
+                .body("size()", lessThanOrEqualTo(2));
     }
 
     @Test
@@ -77,5 +79,12 @@ class PublicEndpointsTest {
                 .then().statusCode(200)
                 .body("name", hasItem("Willem Jan Glerum"))
                 .body("find { it.name == 'Willem Jan Glerum' }.sessions.size()", greaterThan(0));
+    }
+
+    @Test
+    void auditLiveDashboardServesHtml() {
+        given().when().get("/audit-live/")
+                .then().statusCode(200)
+                .body(containsString("audit_event"));
     }
 }

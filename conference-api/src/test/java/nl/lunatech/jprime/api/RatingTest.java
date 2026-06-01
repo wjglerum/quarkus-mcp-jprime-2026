@@ -1,8 +1,8 @@
 package nl.lunatech.jprime.api;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.security.TestSecurity;
 import org.junit.jupiter.api.Test;
 
@@ -43,8 +43,6 @@ class RatingTest {
     @Test
     @TestSecurity(user = "rater-2", roles = {"attendee"})
     void rateSessionThatHasNotStartedReturns422() {
-        // "Beyond the LLM API" runs on day 2 at 16:25, well after the rehearsal
-        // clock above (day 1 at 13:30), so the server should refuse the rating.
         int id = sessionId("Beyond the LLM API");
         given().contentType("application/json")
                 .body("{\"stars\":4,\"comment\":\"too early\"}")

@@ -51,6 +51,7 @@ public class RatingResource {
             return Response.status(422)
                     .entity("{\"error\":\"session_not_started\",\"description\":"
                             + "\"You cannot rate a session before it has started.\"}")
+                    .type(MediaType.APPLICATION_JSON)
                     .build();
         }
         Attendee me = attendees.currentAttendee();

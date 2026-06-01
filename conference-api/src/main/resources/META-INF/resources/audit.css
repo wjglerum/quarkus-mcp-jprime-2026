@@ -1,13 +1,3 @@
-/* Palette lifted from the talk deck:
-   #0E1116 background
-   #171B22 surface
-   #2A313C card border
-   #F5F7FA primary text
-   #9AA4B2 muted text
-   #5F6B7A footer text
-   #0088D3 brand blue
-   #F2A65A amber accent (step-up / destructive) */
-
 :root {
     --bg:        #0E1116;
     --surface:   #171B22;

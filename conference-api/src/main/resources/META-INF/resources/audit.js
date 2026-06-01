@@ -14,8 +14,8 @@
     function classifyAction(action) {
         if (!action) return '';
         const a = action.toUpperCase();
-        if (a.includes('CANCEL')) return 'destructive';
-        if (a.includes('REJECTED')) return 'destructive';
+        if (a.includes('CANCEL_SESSION') && !a.includes('ATTEMPT') && !a.includes('UNDONE')) return 'destructive';
+        if (a.includes('REJECTED')) return 'step-up';
         if (a.includes('ATTEMPT')) return 'step-up';
         if (a.includes('VIEW_SESSION_ATTENDEES')) return 'step-up';
         return '';

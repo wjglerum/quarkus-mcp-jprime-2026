@@ -43,14 +43,8 @@ public class SpeakerSessionResource {
             throw new StepUpRequiredException("attendee list requires MFA-backed authentication");
         }
         Session session = requireOwnedSession(id);
-        return Bookmark.list("session.id = ?1 order by createdAt asc", session.id).stream()
-                .map(b -> {
-                    Bookmark bm = (Bookmark) b;
-                    return new AttendeeBookmarkDto(
-                            bm.attendee.id,
-                            bm.attendee.displayName,
-                            bm.createdAt);
-                })
+        return Bookmark.<Bookmark>list("session.id = ?1 order by createdAt asc", session.id).stream()
+                .map(AttendeeBookmarkDto::of)
                 .toList();
     }
 

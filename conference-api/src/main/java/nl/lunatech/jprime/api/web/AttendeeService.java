@@ -56,14 +56,17 @@ public class AttendeeService {
 
     public boolean hasStrongAcr() {
         Object acr = jwt == null ? null : jwt.getClaim("acr");
-        if (acr != null && ("2".equals(acr.toString())
-                || "urn:mace:incommon:iap:silver".equals(acr.toString()))) {
-            return true;
+        if (acr != null) {
+            String acrStr = String.valueOf(acr);
+            if ("2".equals(acrStr) || "urn:mace:incommon:iap:silver".equals(acrStr)) {
+                return true;
+            }
         }
         Object amr = jwt == null ? null : jwt.getClaim("amr");
         if (amr instanceof Iterable<?> it) {
             for (Object o : it) {
-                if ("mfa".equals(String.valueOf(o)) || "otp".equals(String.valueOf(o))) {
+                String s = String.valueOf(o);
+                if ("mfa".equals(s) || "otp".equals(s)) {
                     return true;
                 }
             }
@@ -90,10 +93,16 @@ public class AttendeeService {
 
     private String nameFromJwt() {
         if (jwt != null) {
-            String name = jwt.getClaim("name");
-            if (name != null && !name.isBlank()) return name;
-            String preferred = jwt.getClaim("preferred_username");
-            if (preferred != null && !preferred.isBlank()) return preferred;
+            Object rawName = jwt.getClaim("name");
+            if (rawName != null) {
+                String name = String.valueOf(rawName);
+                if (!name.isBlank()) return name;
+            }
+            Object rawPreferred = jwt.getClaim("preferred_username");
+            if (rawPreferred != null) {
+                String preferred = String.valueOf(rawPreferred);
+                if (!preferred.isBlank()) return preferred;
+            }
         }
         return identity.getPrincipal().getName();
     }

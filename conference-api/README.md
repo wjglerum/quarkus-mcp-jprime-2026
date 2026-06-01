@@ -1,65 +1,106 @@
 # conference-api
 
-The data API for the jPrime 2026 MCP demo. Owns the conference schedule, attendee agendas, ratings, and the audit log.
+Backing data API for the jPrime 2026 MCP demo. Exposes the schedule, attendee
+agendas, ratings, and an open audit feed under `/api/v1/`, and serves the
+second-screen audit dashboard at `/audit-live/`.
 
-## Run
+Part of a three-app monorepo. See `../SPEC.md` for the demo's source of truth
+and `../AGENTS.md` plus `AGENTS.md` for working conventions.
 
-```bash
+## Stack
+
+- Quarkus 3.x on Java 25
+- REST (Reactive) + Jackson
+- Hibernate ORM with Panache, PostgreSQL via Dev Services
+- OIDC bearer-only (Keycloak via Dev Services, shared realm at
+  `../keycloak-realm.json`)
+- SmallRye OpenAPI + Swagger UI
+- Hibernate Validator
+- SmallRye Health
+
+No Flyway. Hibernate generates the schema (`drop-and-create` in dev and test,
+`none` in prod).
+
+## Running
+
+From this directory:
+
+```shell
 ./mvnw quarkus:dev
 ```
 
-In dev mode OIDC is disabled, so endpoints are open. Dev Services boots Postgres in the background. Hibernate owns the schema via `quarkus.hibernate-orm.database.generation=drop-and-create`; there is no Flyway. On startup the app seeds itself from the baked-in agenda snapshot.
+Dev Services boots Postgres and a shared Keycloak realm automatically. The
+seeders fill the schedule from `src/main/resources/seed/jprime-2026-agenda.json`
+and create demo attendees, bookmarks, and ratings.
 
-## Endpoints
+Useful URLs in dev mode:
 
-All under `/api/v1/`.
+- `http://localhost:8080/q/dev/` -- Dev UI
+- `http://localhost:8080/q/swagger-ui/` -- Swagger UI
+- `http://localhost:8080/audit-live/` -- second-screen audit dashboard
+- `http://localhost:8080/api/v1/sessions` -- public schedule
+- `http://localhost:8080/api/v1/audit/recent` -- open audit feed
 
-### Public (no auth)
-- `GET /sessions` list. Filters: `day`, `track`, `speaker_id`, `level`, `q`.
-- `GET /sessions/{id}`
-- `GET /sessions/current` accepts `?at=` for demo determinism.
-- `GET /sessions/next` accepts `?at=` and `?limit=` (default 3).
-- `GET /speakers` and `GET /speakers/{id}/sessions`.
+## REST surface
 
-### Attendee (role `attendee`)
-- `GET /me`, `GET /me/agenda`, `POST /me/agenda`, `DELETE /me/agenda/{sessionId}`
-- `GET /me/conflicts`, `GET /me/ratings`
-- `POST /sessions/{id}/ratings` refuses to rate sessions that have not started yet (422).
-- `GET /audit` recent audit lines for the second-screen demo.
+Public (no auth):
 
-### Speaker (role `speaker`)
-- `GET /me/sessions/feedback` aggregate + individual ratings on my sessions.
+- `GET /api/v1/sessions` (`?speaker_id=`, `?q=`)
+- `GET /api/v1/sessions/{id}`
+- `GET /api/v1/sessions/current?at=`
+- `GET /api/v1/sessions/next?at=&limit=`
+- `GET /api/v1/speakers`
+- `GET /api/v1/audit/recent?limit=`
 
-### Speaker, step-up required (acr=`urn:mace:incommon:iap:silver` or amr containing `mfa`/`otp`)
-- `GET /sessions/{id}/attendees` attendee names and emails. Returns 401 with `WWW-Authenticate: Bearer error="insufficient_user_authentication"` if step-up is missing.
-- `POST /sessions/{id}/cancel` reversible toggle; every call is audited.
+Attendee role (`attendee`):
 
-OpenAPI lives at `/q/openapi` and Swagger UI at `/q/swagger-ui`.
+- `GET /api/v1/me`
+- `GET|POST /api/v1/me/agenda`, `DELETE /api/v1/me/agenda/{sessionId}`
+- `GET /api/v1/me/conflicts`
+- `POST /api/v1/sessions/{id}/ratings`
+- `GET /api/v1/me/ratings`
 
-## Auth
+Speaker role (`speaker`):
 
-`quarkus-oidc` in `service` (bearer-only) mode. Roles come from the Keycloak claim path `realm_access/roles`. The shared Keycloak realm import lives at the monorepo root and is referenced via `quarkus.keycloak.devservices.realm-path=../keycloak-realm.json`. There is no `infra/` directory.
+- `GET /api/v1/me/sessions/feedback`
 
-## Seeding
+Speaker role plus step-up
+(`acr=urn:mace:incommon:iap:silver` or `acr=2`, or `amr` containing `mfa`/`otp`):
 
-On startup, `StartupSeeder` runs two idempotent steps in order:
-1. `StaticScheduleSeeder` loads `seed/jprime-2026-agenda.json` from the classpath if the database has no sessions. The snapshot ships **32 sessions and 27 speakers** across the two jPrime 2026 days, including Willem Jan on the MCP talk (Hall B, day 1 10:00) and on the Concurrency Crossroads deep dive.
-2. `DemoDataSeeder` creates ~10 fake attendees, ~15 bookmarks, ~25 ratings (with extra coverage of Willem Jan's sessions for the speaker feedback demo).
+- `GET /api/v1/sessions/{id}/attendees`
+- `POST /api/v1/sessions/{id}/cancel` (reversible toggle)
 
-There is no admin reseed endpoint. To reset state between rehearsals, restart `conference-api` after wiping the Dev Services Postgres container: `docker ps --filter "label=quarkus-dev-service.postgresql" -q | xargs -r docker rm -f`. Hibernate `drop-and-create` plus both seeders give you a clean slate on the next boot.
+## Demo clock
 
-## Testing
+The rating cutoff and `whats_on_now`/`whats_next` resolve to `demo.now` when
+set, otherwise to the wall clock at offset `+03:00`. In `%dev` the default is
+`2026-06-03T10:45:00+03:00` so the demo lands on Wednesday mid-morning out of
+the box. Override with `DEMO_NOW`.
 
-```bash
+## Tests
+
+Run the full suite (no live Keycloak required, OIDC tenant is disabled in
+`%test`):
+
+```shell
 ./mvnw test
 ```
 
-Uses Quarkus Dev Services (Testcontainers Postgres). Tests use `@TestSecurity` and `@OidcSecurity` to simulate users without standing up Keycloak.
+The suite covers public endpoints, the audit-live dashboard route, attendee
+agenda CRUD with audit, rating gating against a profile-pinned demo clock, the
+open audit feed, and step-up + reversible cancellation for the speaker.
 
-## Related guides
+## Configuration
 
-- [Hibernate ORM with Panache](https://quarkus.io/guides/hibernate-orm-panache)
-- [REST](https://quarkus.io/guides/rest) and [REST Jackson](https://quarkus.io/guides/rest#json-serialisation)
-- [SmallRye OpenAPI](https://quarkus.io/guides/openapi-swaggerui)
-- [JDBC Postgres](https://quarkus.io/guides/datasource)
-- [OpenID Connect](https://quarkus.io/guides/security-openid-connect)
+See `src/main/resources/application.properties`. Production needs:
+
+- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
+- `OIDC_AUTH_SERVER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`
+- `DEMO_NOW` if you want a fixed clock; otherwise unset.
+
+## Packaging
+
+```shell
+./mvnw package
+java -jar target/quarkus-app/quarkus-run.jar
+```

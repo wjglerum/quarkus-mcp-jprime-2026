@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>jPrime 2026 / Audit Stream</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="audit.css">
+  <link rel="stylesheet" href="/audit.css">
 </head>
 <body>
   <header class="topbar">
@@ -41,7 +41,7 @@
   <footer>
     <span>conference-api / /api/v1/audit/recent</span>
     <span class="brand-sep">/</span>
-    <span>refresh 2s</span>
+    <span>refresh {pollIntervalSeconds}s</span>
   </footer>
 
   <template id="event-template">
@@ -67,6 +67,6 @@
     </article>
   </template>
 
-  <script src="audit.js"></script>
+  <script src="/audit.js"></script>
 </body>
 </html>

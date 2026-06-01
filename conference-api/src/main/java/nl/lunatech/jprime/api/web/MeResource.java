@@ -28,7 +28,9 @@ import nl.lunatech.jprime.api.dto.SessionFeedbackDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Path("/api/v1/me")
 @Produces(MediaType.APPLICATION_JSON)
@@ -100,7 +102,7 @@ public class MeResource {
         List<Session> sessions = Bookmark.listByAttendee(me.id).stream()
                 .map(b -> b.session)
                 .toList();
-        java.util.Set<Long> overlapping = new java.util.LinkedHashSet<>();
+        Set<Long> overlapping = new LinkedHashSet<>();
         for (int i = 0; i < sessions.size(); i++) {
             for (int j = i + 1; j < sessions.size(); j++) {
                 Session a = sessions.get(i);

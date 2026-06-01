@@ -4,9 +4,9 @@ import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import nl.lunatech.jprime.mcp.api.PublicConferenceApi;
 import nl.lunatech.jprime.mcp.dto.SessionDto;
 import nl.lunatech.jprime.mcp.dto.SpeakerDto;
-import nl.lunatech.jprime.mcp.api.PublicConferenceApi;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
@@ -25,21 +25,27 @@ public class PublicTools {
     Optional<String> demoNow;
 
     @Tool(name = "list_sessions",
-            description = "Search the jPrime 2026 schedule. Use this to find talks by topic or "
-                    + "by speaker name. Returns matching sessions sorted by start time.")
+            description = "Search the jPrime 2026 conference schedule. Use this when the user asks "
+                    + "to find talks by topic, keyword, or by speaker name. Returns matching sessions "
+                    + "sorted by start time, each with its title, abstract, room, timing, and the "
+                    + "primary speaker. Pass `query` for free-text search across titles and abstracts, "
+                    + "or `speaker_name` to filter by a speaker (case-insensitive substring match). "
+                    + "Both arguments may be combined.")
     public List<SessionDto> listSessions(
-            @ToolArg(name = "query", description = "Case-insensitive substring match on title or abstract",
+            @ToolArg(name = "query",
+                    description = "Optional case-insensitive substring matched against session "
+                            + "titles and abstracts.",
                     required = false) String query,
             @ToolArg(name = "speaker_name",
-                    description = "Filter by speaker name (case-insensitive substring match). "
-                            + "If supplied, the tool first resolves the speaker via the speakers list.",
+                    description = "Optional speaker name (case-insensitive substring). Resolved "
+                            + "against the speakers list before filtering sessions.",
                     required = false) String speakerName) {
-
         Long speakerId = null;
         if (speakerName != null && !speakerName.isBlank()) {
             String needle = speakerName.toLowerCase(Locale.ENGLISH);
             speakerId = api.listSpeakers().stream()
-                    .filter(s -> s.name() != null && s.name().toLowerCase(Locale.ENGLISH).contains(needle))
+                    .filter(s -> s.name() != null
+                            && s.name().toLowerCase(Locale.ENGLISH).contains(needle))
                     .map(SpeakerDto::id)
                     .findFirst()
                     .orElse(null);
@@ -48,26 +54,33 @@ public class PublicTools {
     }
 
     @Tool(name = "get_session",
-            description = "Get full details for one session including abstract and speakers.")
+            description = "Get full details for one session, including its abstract, room, timing, "
+                    + "cancellation state, and the primary speaker. Use this after `list_sessions` "
+                    + "when the user picks a specific talk and wants more context.")
     public SessionDto getSession(
-            @ToolArg(name = "session_id", description = "Numeric session id from list_sessions",
+            @ToolArg(name = "session_id",
+                    description = "Numeric session id returned by `list_sessions`.",
                     required = true) Long sessionId) {
         return api.getSession(sessionId);
     }
 
     @Tool(name = "whats_on_now",
-            description = "Find out which sessions are happening right now at jPrime. "
-                    + "Uses the configured demo clock when set so rehearsals are deterministic.")
+            description = "List the sessions that are happening right now at jPrime 2026. Use this "
+                    + "when the user asks `what is on now`, `what is happening`, or `what is in the "
+                    + "current slot`. The conference clock can be pinned via the `DEMO_NOW` "
+                    + "environment variable so rehearsals stay deterministic.")
     public List<SessionDto> whatsOnNow() {
         return api.currentSessions(demoNow.orElse(null));
     }
 
     @Tool(name = "whats_next",
-            description = "Find out which sessions are starting next. Default returns three sessions.")
+            description = "List the next upcoming sessions starting after the current conference "
+                    + "clock. Use this when the user asks `what is next`, `what is coming up`, or "
+                    + "wants a short look-ahead. Returns three sessions by default; cap at 20.")
     public List<SessionDto> whatsNext(
-            @ToolArg(name = "limit", description = "Max number of upcoming sessions to return",
+            @ToolArg(name = "limit",
+                    description = "Maximum number of upcoming sessions to return. Defaults to 3.",
                     required = false, defaultValue = "3") Integer limit) {
         return api.nextSessions(demoNow.orElse(null), limit);
     }
-
 }

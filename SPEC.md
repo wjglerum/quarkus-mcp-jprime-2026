@@ -216,14 +216,14 @@ No admin reseed endpoint. Resetting demo state is a Dev Services container resta
 
 ## /audit-live/ dashboard (conference-api)
 
-The second-screen UI that lands every audit event in real time. Static SPA under `src/main/resources/META-INF/resources/audit-live/`. Polls `GET /api/v1/audit/recent?limit=30` every 2 seconds and renders events as cards in the "slide 14" struct layout (action / target / attendee_subject / token_acr / token_amr / detail).
+The second-screen UI that lands every audit event in real time. **Served by a Qute template via a public JAX-RS resource**, mirroring the conference-chat pattern: a `nl.lunatech.jprime.api.web.AuditLivePageResource` (`@Path("/audit-live")`, `@PermitAll`) with a `@CheckedTemplate` interface renders `templates/AuditLivePageResource/audit.html`. Vanilla JS under `META-INF/resources/audit.js` polls `GET /api/v1/audit/recent?limit=30` every 2 seconds and appends cards in the slide-14 struct layout (action / target / attendee_subject / token_acr / token_amr / detail). The Qute template emits the shell (top bar, hero, empty state, `<template>` element for cards) and any seed data known at request time.
+
+conference-api therefore lists `quarkus-qute` and `quarkus-rest-qute` in its extensions.
 
 Color rules (deck palette):
 - Brand blue (`#0088D3`) left border: normal action.
-- Amber (`#F2A65A`) left border: step-up tool (view_session_attendees, RATE_SESSION_REJECTED_NOT_STARTED).
-- Red (`#E5645A`) left border: destructive (CANCEL_SESSION).
-
-No build tooling: vanilla HTML/CSS/JS so the dashboard hot-reloads with the Quarkus dev mode.
+- Amber (`#F2A65A`) left border: step-up tool (`view_session_attendees`, `RATE_SESSION_REJECTED_NOT_STARTED`).
+- Red (`#E5645A`) left border: destructive (`CANCEL_SESSION`, `CANCEL_SESSION_ATTEMPTED`).
 
 ---
 
@@ -355,7 +355,7 @@ The chat SPA is rendered with **Qute templates** server-side for everything that
 - `/api/chat/quick-prompts` and `/api/chat/providers` remain available for completeness (the JS still uses them to refresh after a provider change), but they are no longer the source of truth for the initial render.
 - Use Qute's type-safe templates where reasonable: declare a `Templates` interface with method-per-page binding so the IDE catches missing parameters.
 
-The audit-live dashboard stays vanilla static HTML for now (no dynamic shell content needed; the JS poll renders everything).
+Both SPAs (the chat shell and the audit-live dashboard) are rendered server-side by Qute; the JS layer only handles incremental DOM updates (the chat composer and the audit-live poll).
 
 ### Routes (served on port 8082)
 
@@ -421,7 +421,7 @@ A LangChain4j `AiService` with the MCP tool provider attached. System prompt is 
   - `conference-mcp` -- confidential, used for service-to-service calls and as the OIDC client for the Dev UI login on port 8081. **PKCE method `S256` required on the auth code flow.** Token exchange enabled.
   - `conference-chat` -- confidential, dedicated client for the chat web-app on port 8082. PKCE `S256` required. Redirect URIs include `http://localhost:8082/*` plus the Dev UI callback paths on 8080 and 8081.
   - `mcp-clients` -- public, allows Dynamic Client Registration. Used by MCP Inspector and any other MCP client.
-- Realm roles: `attendee`, `speaker`. (No custom `attendee` / `speaker` client scopes; roles flow through the realm-default `roles` scope into `realm_access.roles`.)
+- **Realm roles vs client scopes**: `attendee` and `speaker` are realm **roles**, not client scopes. The realm ships no custom `attendee` / `speaker` client scopes; the roles ride into the access token via the realm-default `roles` scope and surface at the JWT path `realm_access/roles`. None of the three apps may set `quarkus.oidc.authentication.scopes=attendee,speaker` (or any other non-existent scope) -- Keycloak rejects the auth request with `Invalid scopes`. The only OIDC scope-related config that should appear is `quarkus.oidc.roles.role-claim-path=realm_access/roles` on each app.
 - Users (seeded in the realm export):
   - `attendee1` / `attendee1` -- role `attendee`.
   - `willem.jan` / `willem.jan` -- roles `attendee` + `speaker`, linked to the Willem Jan speaker fixture. **Not TOTP-enrolled in the seeded realm.**
@@ -439,7 +439,6 @@ Exactly **one** `keycloak-realm.json` lives at the monorepo root. The three apps
 The realm was derived from Dev Services' default `quarkus` realm so it ships the canonical client scopes (`basic`, `profile`, `email`, `roles`, `web-origins`, `acr`, `microprofile-jwt`) and the protocol mappers that emit `sub`, `preferred_username`, `name`, and `email`. A few gotchas worth keeping in mind when editing:
 
 - Leave `defaultClientScopes` empty on each app client so the realm-level defaults apply; overriding with a short list strips `basic` and kills the `sub` claim.
-- `quarkus.oidc.authentication.scopes` lists only the client's *optional* scopes (eg `attendee,speaker`). Quarkus prepends `openid` and the realm-default scopes are added by Keycloak automatically.
 - Do not hardcode `frontendUrl`; Dev Services maps Keycloak to a random host port.
 - `acr.loa.map` keys are ACR strings, values are integer-as-string levels (`"urn:mace:incommon:iap:silver": "2"`).
 
@@ -590,6 +589,16 @@ No Flyway. Hibernate owns the schema in dev and test (`drop-and-create`). In pro
 | `ANTHROPIC_API_KEY` | Anthropic provider key. | unset (provider disabled) |
 | `OPENAI_API_KEY` | OpenAI provider key. | unset (provider disabled) |
 | `CHAT_LLM_PROVIDER` | Initial provider on boot: `scripted`, `anthropic`, `openai`, `ollama`. | `scripted` |
+
+### HTTP access logging
+
+All three apps **must** enable HTTP access logs so the request flow is traceable on stage (and the audience can follow along when the speaker tails the log). Each `application.properties` includes:
+
+```
+quarkus.http.access-log.enabled=true
+```
+
+Use the Quarkus default pattern (`common`: `%h %l %u %t "%r" %s %b`). Do not customise it; the default is good enough for the demo and avoids the trap of accidentally including `%{i,Authorization}` (which would leak bearer tokens to stdout).
 
 ---
 

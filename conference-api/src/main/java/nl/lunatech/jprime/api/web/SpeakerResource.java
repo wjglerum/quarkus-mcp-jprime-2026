@@ -28,7 +28,7 @@ public class SpeakerResource {
                                     "from Session s left join fetch s.speaker where s.speaker.id = ?1 order by s.startsAt",
                                     sp.id)
                             .stream().map(SessionDto::of).toList();
-                    return new SpeakerListDto(sp.id, sp.name, sp.bio, sessions);
+                    return SpeakerListDto.of(sp, sessions);
                 })
                 .toList();
     }
