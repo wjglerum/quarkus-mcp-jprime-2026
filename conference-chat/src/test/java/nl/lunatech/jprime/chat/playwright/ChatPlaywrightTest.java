@@ -37,10 +37,17 @@ class ChatPlaywrightTest {
     @TestHTTPResource("/")
     URL chatBase;
 
+    private Page freshPage() {
+        BrowserContext isolated = context.browser().newContext();
+        Page page = isolated.newPage();
+        page.setDefaultTimeout(60_000);
+        page.setDefaultNavigationTimeout(60_000);
+        return page;
+    }
+
     @Test
     void anonymousRequestRedirectsToKeycloakLogin() {
-        context.clearCookies();
-        Page page = context.newPage();
+        Page page = freshPage();
         page.navigate(chatBase.toString());
         page.waitForURL("**/realms/jprime/protocol/openid-connect/auth**");
         page.waitForLoadState(LoadState.DOMCONTENTLOADED);
@@ -50,8 +57,7 @@ class ChatPlaywrightTest {
 
     @Test
     void willemJanLoginRendersQuteShell() {
-        context.clearCookies();
-        Page page = context.newPage();
+        Page page = freshPage();
         page.navigate(chatBase.toString());
         page.waitForURL("**/realms/jprime/protocol/openid-connect/auth**");
         page.locator("#username").fill("willem.jan");
@@ -82,8 +88,7 @@ class ChatPlaywrightTest {
 
     @Test
     void attendee1LoginRendersQuickPromptsWithStepUpTier() {
-        context.clearCookies();
-        Page page = context.newPage();
+        Page page = freshPage();
         page.navigate(chatBase.toString());
         page.waitForURL("**/realms/jprime/protocol/openid-connect/auth**");
         page.locator("#username").fill("attendee1");
