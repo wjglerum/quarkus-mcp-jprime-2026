@@ -44,6 +44,10 @@ public class AttendeeService {
 
     private String subjectFromJwt() {
         if (jwt != null) {
+            Object preferredUsername = jwt.getClaim("preferred_username");
+            if (preferredUsername != null && !String.valueOf(preferredUsername).isBlank()) {
+                return String.valueOf(preferredUsername);
+            }
             String sub = jwt.getSubject();
             if (sub != null && !sub.isBlank()) return sub;
         }

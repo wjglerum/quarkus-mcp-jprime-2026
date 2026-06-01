@@ -283,7 +283,7 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": [
         "http://localhost:8082/*",
-        "http://localhost:*/*"
+        "http://localhost:*"
       ],
       "webOrigins": [
         "+"
@@ -314,7 +314,7 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": [
         "http://localhost:6274/*",
-        "http://localhost:*/*"
+        "http://localhost:*"
       ],
       "webOrigins": [
         "+"

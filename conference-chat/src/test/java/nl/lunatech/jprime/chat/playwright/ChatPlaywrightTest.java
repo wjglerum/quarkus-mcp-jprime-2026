@@ -39,15 +39,18 @@ class ChatPlaywrightTest {
 
     @Test
     void anonymousRequestRedirectsToKeycloakLogin() {
+        context.clearCookies();
         Page page = context.newPage();
         page.navigate(chatBase.toString());
         page.waitForURL("**/realms/jprime/protocol/openid-connect/auth**");
+        page.waitForLoadState(LoadState.DOMCONTENTLOADED);
         assertThat(page.locator("#username").isVisible()).isTrue();
         assertThat(page.locator("#kc-login").isVisible()).isTrue();
     }
 
     @Test
     void willemJanLoginRendersQuteShell() {
+        context.clearCookies();
         Page page = context.newPage();
         page.navigate(chatBase.toString());
         page.waitForURL("**/realms/jprime/protocol/openid-connect/auth**");
@@ -79,6 +82,7 @@ class ChatPlaywrightTest {
 
     @Test
     void attendee1LoginRendersQuickPromptsWithStepUpTier() {
+        context.clearCookies();
         Page page = context.newPage();
         page.navigate(chatBase.toString());
         page.waitForURL("**/realms/jprime/protocol/openid-connect/auth**");

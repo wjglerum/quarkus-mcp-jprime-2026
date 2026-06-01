@@ -4,6 +4,7 @@ import io.quarkus.oidc.IdToken;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
 import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -32,6 +33,9 @@ public class ChatPageResource {
     @Inject
     ProviderRegistry providers;
 
+    @Inject
+    SecurityIdentity identity;
+
     @CheckedTemplate
     public static class Templates {
         public static native TemplateInstance chat(Me me,
@@ -50,9 +54,9 @@ public class ChatPageResource {
     }
 
     private Me buildMe() {
-        String subject = accessToken.getSubject();
+        String subject = JwtClaims.string(accessToken, "preferred_username", accessToken.getSubject());
         String name = nameClaim();
-        Set<String> roles = accessToken.getGroups() == null ? Set.of() : accessToken.getGroups();
+        Set<String> roles = identity.getRoles() == null ? Set.of() : identity.getRoles();
         String rolesDisplay = roles.isEmpty() ? "(none)" : String.join(", ", roles);
         String acr = JwtClaims.string(accessToken, "acr", "1");
         String amrDisplay = JwtClaims.joinedStringList(accessToken, "amr", "(none)");

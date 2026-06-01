@@ -101,7 +101,7 @@ One speaker per session is the simplifying constraint. If a real talk has co-spe
 
 ### Attendee
 - id (long, pk)
-- subject (string, the OIDC sub claim, unique)
+- subject (string, the OIDC `preferred_username` claim eg `willem.jan`, unique; falls back to the `sub` claim when `preferred_username` is absent). The `sub` claim is an opaque UUID, so `preferred_username` is the stable, human-readable identity used across the audit log and the speaker seed shortcut.
 - display_name (string)
 - speaker_id (fk to Speaker, nullable; non-null means "is a speaker")
 
@@ -361,6 +361,8 @@ Both SPAs (the chat shell and the audit-live dashboard) are rendered server-side
 
 - `GET /` -- serves `chat.html`. Authenticated; redirects to Keycloak when unauthenticated.
 - `GET /chat.css`, `GET /chat.js`, `GET /favicon.ico` -- public assets.
+
+The `/api/*` endpoints are authenticated but must return **HTTP 401 anonymously** rather than a login redirect, so programmatic callers and the acceptance check get a clean status while the browser page `/` still redirects. Plain `web-app` OIDC redirects every unauthenticated request. To split the behavior, register an `@Alternative @Priority(1)` `HttpAuthenticationMechanism` (`nl.lunatech.jprime.chat.security.ApiAwareAuthMechanism`) that delegates to `OidcAuthenticationMechanism` for everything, but overrides `getChallenge` to return `ChallengeData(401, null, null)` when the path starts with `/api/`. The OIDC code flow (callback, PKCE, state) is untouched because `authenticate` delegates fully.
 - `GET /q/*` -- public (Dev UI, health, OIDC callback).
 - `GET /api/chat/me` -- returns the current user's `subject`, `name`, `roles`, `acr`, `amr`, and a `provider`/`llmAvailable` hint for the UI.
 - `GET /api/chat/quick-prompts` -- list of demo-ready prompts with their suggested tool and tier (`public`, `attendee`, `speaker`, `step-up`).
@@ -421,7 +423,7 @@ A LangChain4j `AiService` with the MCP tool provider attached. System prompt is 
   - `conference-mcp` -- confidential, used for service-to-service calls and as the OIDC client for the Dev UI login on port 8081. **PKCE method `S256` required on the auth code flow.** Token exchange enabled.
   - `conference-chat` -- confidential, dedicated client for the chat web-app on port 8082. PKCE `S256` required. Redirect URIs include `http://localhost:8082/*` plus the Dev UI callback paths on 8080 and 8081.
   - `mcp-clients` -- public, allows Dynamic Client Registration. Used by MCP Inspector and any other MCP client.
-- **Realm roles vs client scopes**: `attendee` and `speaker` are realm **roles**, not client scopes. The realm ships no custom `attendee` / `speaker` client scopes; the roles ride into the access token via the realm-default `roles` scope and surface at the JWT path `realm_access/roles`. None of the three apps may set `quarkus.oidc.authentication.scopes=attendee,speaker` (or any other non-existent scope) -- Keycloak rejects the auth request with `Invalid scopes`. The only OIDC scope-related config that should appear is `quarkus.oidc.roles.role-claim-path=realm_access/roles` on each app.
+- **Realm roles vs client scopes**: `attendee` and `speaker` are realm **roles**, not client scopes. The realm ships no custom `attendee` / `speaker` client scopes; the roles ride into the access token via the realm-default `roles` scope and surface at the JWT path `realm_access/roles`. None of the three apps may set `quarkus.oidc.authentication.scopes=attendee,speaker` (or any other non-existent scope) -- Keycloak rejects the auth request with `Invalid scopes`. The only OIDC scope-related config that should appear is `quarkus.oidc.roles.role-claim-path=realm_access/roles` on each app. The realm's `realm roles` mapper writes `realm_access.roles` into the **access token only** (not the ID token). conference-api and conference-mcp run in `service` mode, so they read roles from the access token by default. conference-chat runs in `web-app` mode, where roles default to the ID token, so it must also set `quarkus.oidc.roles.source=accesstoken`; otherwise `SecurityIdentity.getRoles()` is empty and the identity panel shows no roles. Read roles from `SecurityIdentity.getRoles()`, not `JsonWebToken.getGroups()` (the latter reads the token `groups` claim, which the realm does not populate).
 - Users (seeded in the realm export):
   - `attendee1` / `attendee1` -- role `attendee`.
   - `willem.jan` / `willem.jan` -- roles `attendee` + `speaker`, linked to the Willem Jan speaker fixture. **Not TOTP-enrolled in the seeded realm.**
@@ -646,9 +648,9 @@ class ChatPlaywrightTest {
 }
 ```
 
-`@TestHTTPResource("/")` provides the chat's URL on the random test port; `@InjectPlaywright BrowserContext` provides a fresh browser context per test method.
+`@TestHTTPResource("/")` provides the chat's URL on the random test port; `@InjectPlaywright BrowserContext` provides a browser context. The context is reused across methods in this Quarkus version, so each scenario calls `context.clearCookies()` before navigating to drop any session and Keycloak SSO cookie from a prior method. Each app also sets `%test.quarkus.http.test-port=0` so the test server takes a random free port and the suite can run while the dev apps hold 8080 to 8082.
 
-The realm export's `conference-chat` client declares `redirectUris = ["http://localhost:8082/*", "http://localhost:*/*"]` and `webOrigins = ["+"]` so the OIDC redirect succeeds on whatever random port Quarkus picks for the test server.
+The realm export's `conference-chat` client declares `redirectUris = ["http://localhost:8082/*", "http://localhost:*"]` and `webOrigins = ["+"]` so the OIDC redirect succeeds on whatever random port Quarkus picks for the test server. **Keycloak 26 only honours a `*` wildcard at the end of a redirect URI**, so the any-port entry is `http://localhost:*` (trailing wildcard), not `http://localhost:*/*` (mid-URI wildcard, which Keycloak 26 treats literally and rejects with `Invalid parameter: redirect_uri`).
 
 Scenarios that must pass:
 

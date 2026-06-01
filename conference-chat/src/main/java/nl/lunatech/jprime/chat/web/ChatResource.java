@@ -2,6 +2,7 @@ package nl.lunatech.jprime.chat.web;
 
 import io.quarkus.oidc.IdToken;
 import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -47,12 +48,15 @@ public class ChatResource {
     @Inject
     LlmToolPlanner planner;
 
+    @Inject
+    SecurityIdentity identity;
+
     @GET
     @Path("/me")
     public Map<String, Object> me() {
-        Set<String> roles = accessToken.getGroups() == null ? Set.of() : accessToken.getGroups();
+        Set<String> roles = identity.getRoles() == null ? Set.of() : identity.getRoles();
         return Map.of(
-                "subject", accessToken.getSubject(),
+                "subject", JwtClaims.string(accessToken, "preferred_username", accessToken.getSubject()),
                 "name", nameClaim(),
                 "roles", roles,
                 "acr", JwtClaims.string(accessToken, "acr", "1"),
