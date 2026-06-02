@@ -1043,18 +1043,6 @@
         }
       },
       {
-        "id": "32a82bc5-8e41-48f9-b5f6-ab8a3bab3233",
-        "name": "Allowed Client Scopes",
-        "providerId": "allowed-client-templates",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {
-          "allow-default-scopes": [
-            "true"
-          ]
-        }
-      },
-      {
         "id": "58b16b40-f5e1-4e57-afec-ca6b867fefa3",
         "name": "Allowed Protocol Mapper Types",
         "providerId": "allowed-protocol-mappers",
@@ -1093,10 +1081,10 @@
             "127.0.0.1"
           ],
           "host-sending-registration-request-must-match": [
-            "true"
+            "false"
           ],
           "client-uris-must-match": [
-            "false"
+            "true"
           ]
         }
       },
