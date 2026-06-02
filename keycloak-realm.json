@@ -1008,22 +1008,6 @@
   "components": {
     "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
       {
-        "id": "2283b9cc-f13e-492d-9b21-8e5dfbf2011c",
-        "name": "Full Scope Disabled",
-        "providerId": "scope",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {}
-      },
-      {
-        "id": "c3ce13d8-0c0e-42d6-b451-7df667a86237",
-        "name": "Consent Required",
-        "providerId": "consent-required",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {}
-      },
-      {
         "id": "b79a6309-bd60-41d9-b994-4b19b48677a6",
         "name": "Allowed Protocol Mapper Types",
         "providerId": "allowed-protocol-mappers",
