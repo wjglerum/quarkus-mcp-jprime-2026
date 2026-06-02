@@ -13,16 +13,11 @@ import org.jboss.logging.Logger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @ApplicationScoped
 public class ToolDispatcher {
 
     private static final Logger LOG = Logger.getLogger(ToolDispatcher.class);
-
-    private static final Set<String> TOOLS_NEEDING_SESSION_ID = Set.of(
-            "bookmark_session", "unbookmark_session", "rate_session",
-            "get_session", "view_session_attendees", "cancel_my_session");
 
     @Inject
     ToolProvider mcpToolProvider;
@@ -37,18 +32,6 @@ public class ToolDispatcher {
 
         try {
             ToolProviderResult tools = mcpToolProvider.provideTools(null);
-
-            if (TOOLS_NEEDING_SESSION_ID.contains(tool) && !hasNumeric(safeArgs, "session_id")) {
-                Long resolved = resolveSessionId(tools, safeArgs);
-                if (resolved == null) {
-                    String query = String.valueOf(safeArgs.get("session_query"));
-                    return ToolResult.err(tool, safeArgs,
-                            "Could not resolve a session from query '" + query + "'.");
-                }
-                safeArgs.remove("session_query");
-                safeArgs.put("session_id", resolved);
-            }
-
             ToolExecutor executor = findExecutor(tools, tool);
             if (executor == null) {
                 return ToolResult.err(tool, safeArgs, "Unknown MCP tool: " + tool);
@@ -74,59 +57,11 @@ public class ToolDispatcher {
         }
     }
 
-    private Long resolveSessionId(ToolProviderResult tools, Map<String, Object> args) throws Exception {
-        Object queryRaw = args.get("session_query");
-        if (queryRaw == null) return null;
-        String query = queryRaw.toString().trim();
-        if (query.isEmpty()) return null;
-
-        if ("current".equalsIgnoreCase(query)) {
-            Long viaNow = firstSessionIdFromTool(tools, "whats_on_now", Map.of());
-            if (viaNow != null) return viaNow;
-        }
-        return firstSessionIdFromTool(tools, "list_sessions", Map.of("query", query));
-    }
-
-    private Long firstSessionIdFromTool(ToolProviderResult tools, String tool, Map<String, Object> args) throws Exception {
-        ToolExecutor executor = findExecutor(tools, tool);
-        if (executor == null) return null;
-        ToolExecutionRequest request = ToolExecutionRequest.builder()
-                .name(tool)
-                .arguments(mapper.writeValueAsString(args))
-                .build();
-        String body = executor.execute(request, null);
-        if (body == null || body.isBlank()) return null;
-        Object parsed = parseJsonIfPossible(body);
-        return firstId(parsed);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Long firstId(Object node) {
-        if (node instanceof List<?> list && !list.isEmpty()) {
-            return firstId(list.get(0));
-        }
-        if (node instanceof Map<?, ?> map) {
-            Object id = ((Map<String, Object>) map).get("id");
-            if (id instanceof Number n) return n.longValue();
-            if (id != null) {
-                try { return Long.parseLong(id.toString()); } catch (NumberFormatException ignore) { /* fall through */ }
-            }
-        }
-        return null;
-    }
-
     private static ToolExecutor findExecutor(ToolProviderResult tools, String name) {
         for (AiServiceTool t : tools.aiServiceTools()) {
             if (name.equals(t.name())) return t.toolExecutor();
         }
         return null;
-    }
-
-    private static boolean hasNumeric(Map<String, Object> args, String key) {
-        Object v = args.get(key);
-        if (v == null) return false;
-        if (v instanceof Number) return true;
-        try { Long.parseLong(v.toString()); return true; } catch (NumberFormatException e) { return false; }
     }
 
     private Object parseJsonIfPossible(String raw) {

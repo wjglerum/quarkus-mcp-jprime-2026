@@ -25,6 +25,9 @@ public class StepUpTools {
     @Inject
     StepUp stepUp;
 
+    @Inject
+    SessionResolver sessions;
+
     @Tool(name = "view_session_attendees",
             description = "List the attendees (display names) who bookmarked one of the "
                     + "authenticated speaker's sessions. This exposes personal data and requires "
@@ -35,27 +38,36 @@ public class StepUpTools {
                     + "Tell the user that signing in again with a one-time code is needed.")
     public List<AttendeeBookmarkDto> viewSessionAttendees(
             @ToolArg(name = "session_id",
-                    description = "Numeric session id owned by the authenticated speaker.",
-                    required = true) Long sessionId) {
+                    description = "Numeric session id owned by the speaker. Provide this if known.",
+                    required = false) Long sessionId,
+            @ToolArg(name = "session_query",
+                    description = "A few distinctive words from the talk title, used when the "
+                            + "numeric id is unknown.",
+                    required = false) String sessionQuery) {
         stepUp.require();
-        return me.sessionAttendees(sessionId);
+        return me.sessionAttendees(sessions.resolve(sessionId, sessionQuery));
     }
 
     @Tool(name = "cancel_my_session",
             description = "Mark one of the authenticated speaker's own sessions as cancelled, with "
-                    + "a recorded reason. Reversible: calling the tool again with the same session "
-                    + "id toggles the cancellation off and records `CANCEL_SESSION_UNDONE`. Highly "
+                    + "a recorded reason. Reversible: calling the tool again for the same session "
+                    + "toggles the cancellation off and records `CANCEL_SESSION_UNDONE`. Highly "
                     + "destructive in intent, so it requires recent MFA-backed authentication "
-                    + "(step-up). Tell the user this action is fully audited and visible on the "
+                    + "(step-up). Identify the talk with session_query when you do not have the "
+                    + "numeric id. Tell the user this action is fully audited and visible on the "
                     + "live audit feed.")
     public SessionDto cancelMySession(
             @ToolArg(name = "session_id",
-                    description = "Numeric session id owned by the authenticated speaker.",
-                    required = true) Long sessionId,
+                    description = "Numeric session id owned by the speaker. Provide this if known.",
+                    required = false) Long sessionId,
+            @ToolArg(name = "session_query",
+                    description = "A few distinctive words from the talk title, used when the "
+                            + "numeric id is unknown.",
+                    required = false) String sessionQuery,
             @ToolArg(name = "reason",
                     description = "Free-text reason recorded in the audit log.",
                     required = true) String reason) {
         stepUp.require();
-        return me.cancelSession(sessionId, new CancelSessionRequest(reason));
+        return me.cancelSession(sessions.resolve(sessionId, sessionQuery), new CancelSessionRequest(reason));
     }
 }

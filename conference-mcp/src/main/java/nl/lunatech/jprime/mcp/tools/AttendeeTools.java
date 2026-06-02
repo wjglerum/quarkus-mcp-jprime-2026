@@ -25,28 +25,43 @@ public class AttendeeTools {
     @RestClient
     MeConferenceApi me;
 
+    @Inject
+    SessionResolver sessions;
+
     @Tool(name = "bookmark_session",
             description = "Add a session to the authenticated attendee's personal agenda. The "
                     + "bookmark is recorded under the user's identity and audited. Use this when "
-                    + "the user says they want to attend, save, or pin a talk. Returns the new "
-                    + "bookmark with the embedded session details.")
+                    + "the user says they want to attend, save, or pin a talk. Identify the talk "
+                    + "with session_query (a few words of the title) when you do not already have "
+                    + "the numeric id; do not call another tool first to look it up. Returns the "
+                    + "new bookmark with the embedded session details.")
     public BookmarkDto bookmarkSession(
             @ToolArg(name = "session_id",
-                    description = "Numeric session id to bookmark.",
-                    required = true) Long sessionId) {
-        return me.addBookmark(new CreateBookmarkRequest(sessionId));
+                    description = "Numeric session id. Provide this if you already know it.",
+                    required = false) Long sessionId,
+            @ToolArg(name = "session_query",
+                    description = "A few distinctive words from the talk title (e.g. 'MCP Security'), "
+                            + "used to find the session when the numeric id is unknown.",
+                    required = false) String sessionQuery) {
+        return me.addBookmark(new CreateBookmarkRequest(sessions.resolve(sessionId, sessionQuery)));
     }
 
     @Tool(name = "unbookmark_session",
             description = "Remove a session from the authenticated attendee's personal agenda. "
                     + "Idempotent: returns success even if the bookmark was already gone. Use this "
-                    + "when the user wants to drop, unsave, or remove a talk from their schedule.")
+                    + "when the user wants to drop, unsave, or remove a talk from their schedule. "
+                    + "Identify the talk with session_query when you do not have the numeric id.")
     public Acknowledgement unbookmarkSession(
             @ToolArg(name = "session_id",
-                    description = "Numeric session id to remove from the agenda.",
-                    required = true) Long sessionId) {
-        me.removeBookmark(sessionId);
-        return new Acknowledgement(true, "session " + sessionId + " removed from agenda");
+                    description = "Numeric session id. Provide this if you already know it.",
+                    required = false) Long sessionId,
+            @ToolArg(name = "session_query",
+                    description = "A few distinctive words from the talk title, used when the "
+                            + "numeric id is unknown.",
+                    required = false) String sessionQuery) {
+        long id = sessions.resolve(sessionId, sessionQuery);
+        me.removeBookmark(id);
+        return new Acknowledgement(true, "session " + id + " removed from agenda");
     }
 
     @Tool(name = "my_agenda",
@@ -67,13 +82,19 @@ public class AttendeeTools {
     @Tool(name = "rate_session",
             description = "Submit a 1 to 5 star rating with an optional comment for a session the "
                     + "attendee attended. Recorded under the user's identity and fully audited. "
-                    + "Stars must be between 1 and 5 (inclusive). The server refuses to rate a "
-                    + "session that has not started yet; this surfaces as a "
+                    + "To rate a talk by name, pass session_query with a few words of its title "
+                    + "(e.g. 'MCP Security') directly in this call; you do NOT need to look up the "
+                    + "id first. Stars must be between 1 and 5 (inclusive). The server refuses to "
+                    + "rate a session that has not started yet; this surfaces as a "
                     + "`rejected: session_not_started` error.")
     public RatingDto rateSession(
             @ToolArg(name = "session_id",
-                    description = "Numeric session id to rate.",
-                    required = true) Long sessionId,
+                    description = "Numeric session id. Provide this if you already know it.",
+                    required = false) Long sessionId,
+            @ToolArg(name = "session_query",
+                    description = "A few distinctive words from the talk title (e.g. 'MCP Security'), "
+                            + "used to find the session when the numeric id is unknown.",
+                    required = false) String sessionQuery,
             @ToolArg(name = "stars",
                     description = "Star rating between 1 and 5 inclusive.",
                     required = true) Integer stars,
@@ -83,7 +104,7 @@ public class AttendeeTools {
         if (stars == null || stars < 1 || stars > 5) {
             throw new ToolCallException("invalid_argument: stars must be between 1 and 5");
         }
-        return me.rateSession(sessionId, new CreateRatingRequest(stars, comment));
+        return me.rateSession(sessions.resolve(sessionId, sessionQuery), new CreateRatingRequest(stars, comment));
     }
 
     @Tool(name = "my_ratings",

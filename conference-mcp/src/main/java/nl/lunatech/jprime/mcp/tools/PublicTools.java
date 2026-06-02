@@ -19,6 +19,9 @@ public class PublicTools {
     @RestClient
     PublicConferenceApi api;
 
+    @Inject
+    SessionResolver sessions;
+
     @ConfigProperty(name = "demo.now")
     Optional<String> demoNow;
 
@@ -42,13 +45,17 @@ public class PublicTools {
 
     @Tool(name = "get_session",
             description = "Get full details for one session, including its abstract, room, timing, "
-                    + "cancellation state, and the primary speaker. Use this after `list_sessions` "
-                    + "when the user picks a specific talk and wants more context.")
+                    + "cancellation state, and the primary speaker. Identify the talk with "
+                    + "session_query (a few words of the title) when you do not have the numeric id.")
     public SessionDto getSession(
             @ToolArg(name = "session_id",
-                    description = "Numeric session id returned by `list_sessions`.",
-                    required = true) Long sessionId) {
-        return api.getSession(sessionId);
+                    description = "Numeric session id. Provide this if you already know it.",
+                    required = false) Long sessionId,
+            @ToolArg(name = "session_query",
+                    description = "A few distinctive words from the talk title, used when the "
+                            + "numeric id is unknown.",
+                    required = false) String sessionQuery) {
+        return api.getSession(sessions.resolve(sessionId, sessionQuery));
     }
 
     @Tool(name = "whats_on_now",
