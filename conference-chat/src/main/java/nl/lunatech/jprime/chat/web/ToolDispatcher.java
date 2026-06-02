@@ -27,7 +27,8 @@ public class ToolDispatcher {
     @Inject
     ToolProvider mcpToolProvider;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    @Inject
+    ObjectMapper mapper;
 
     public ToolResult invoke(String tool, Map<String, Object> args) {
         Map<String, Object> safeArgs = args == null
@@ -135,7 +136,12 @@ public class ToolDispatcher {
             return raw;
         }
         try {
-            return mapper.readValue(trimmed, Object.class);
+            // The MCP server emits one content block per list element, which the client
+            // concatenates into a single string. Read every JSON value, not just the first,
+            // so multi-result tools (e.g. whats_on_now across tracks) keep all their items.
+            List<Object> values = mapper.readerFor(Object.class).<Object>readValues(trimmed).readAll();
+            if (values.isEmpty()) return raw;
+            return values.size() == 1 ? values.get(0) : values;
         } catch (Exception e) {
             return raw;
         }

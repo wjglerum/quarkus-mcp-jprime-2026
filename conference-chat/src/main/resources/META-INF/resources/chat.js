@@ -113,8 +113,108 @@
                     : JSON.stringify(result.result, null, 2);
         }
 
+        const sessions = (result.error || result.stepUpRequired)
+            ? [] : collectSessions(result.result);
+        if (sessions.length) {
+            card.parentNode.insertBefore(buildSessionSummary(sessions), card);
+        }
+
         transcript.appendChild(node);
         scrollDown();
+    }
+
+    // Sessions arrive embedded in several result shapes: bare SessionDto(s),
+    // bookmarks ({session: ...}), and feedback ({session: ..., ratingCount: ...}).
+    function collectSessions(result) {
+        const items = Array.isArray(result) ? result : [result];
+        const out = [];
+        for (const it of items) {
+            if (!it || typeof it !== 'object') continue;
+            if (it.startsAt && it.title) {
+                out.push({ s: it });
+            } else if (it.session && it.session.startsAt) {
+                let badge = null;
+                if (typeof it.ratingCount === 'number') {
+                    badge = it.ratingCount + ' rating' + (it.ratingCount === 1 ? '' : 's')
+                        + (it.ratingCount ? ', avg ' + Number(it.averageStars).toFixed(1) + '★' : '');
+                }
+                out.push({ s: it.session, badge });
+            }
+        }
+        return out;
+    }
+
+    function buildSessionSummary(entries) {
+        const wrap = document.createElement('div');
+        wrap.className = 'session-summary';
+        const sorted = entries.slice().sort((a, b) =>
+            (a.s.startsAt || '').localeCompare(b.s.startsAt || '')
+            || (a.s.room || '').localeCompare(b.s.room || ''));
+        const tracks = new Set(sorted.map(e => e.s.room).filter(Boolean));
+        const head = document.createElement('div');
+        head.className = 'session-summary-head';
+        head.textContent = sorted.length + ' session' + (sorted.length === 1 ? '' : 's')
+            + (tracks.size > 1 ? ' across ' + tracks.size + ' tracks' : '');
+        wrap.appendChild(head);
+        for (const e of sorted) wrap.appendChild(buildSessionRow(e));
+        return wrap;
+    }
+
+    function buildSessionRow(e) {
+        const s = e.s;
+        const row = document.createElement('div');
+        row.className = 'session-row' + (s.cancelled ? ' cancelled' : '');
+
+        const meta = document.createElement('div');
+        meta.className = 'session-meta';
+        const time = document.createElement('span');
+        time.className = 'session-time';
+        time.textContent = formatRange(s.startsAt, s.endsAt);
+        meta.appendChild(time);
+        if (s.room) {
+            const room = document.createElement('span');
+            room.className = 'session-room';
+            room.textContent = s.room;
+            meta.appendChild(room);
+        }
+        row.appendChild(meta);
+
+        const title = document.createElement('div');
+        title.className = 'session-title';
+        title.textContent = s.title || '(untitled)';
+        row.appendChild(title);
+
+        const bits = [];
+        if (s.speaker && s.speaker.name) bits.push(s.speaker.name);
+        if (e.badge) bits.push(e.badge);
+        if (s.cancelled) bits.push('cancelled' + (s.cancellationReason ? ': ' + s.cancellationReason : ''));
+        if (bits.length) {
+            const sub = document.createElement('div');
+            sub.className = 'session-sub';
+            sub.textContent = bits.join('  ·  ');
+            row.appendChild(sub);
+        }
+        return row;
+    }
+
+    // Always render in the conference's local time so the presenter's laptop
+    // timezone never misleads the audience.
+    const VENUE_TZ = 'Europe/Sofia';
+    const DAY_FMT = new Intl.DateTimeFormat('en-GB',
+        { weekday: 'short', day: 'numeric', month: 'short', timeZone: VENUE_TZ });
+    const TIME_FMT = new Intl.DateTimeFormat('en-GB',
+        { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: VENUE_TZ });
+
+    function formatRange(startIso, endIso) {
+        if (!startIso) return '';
+        const start = new Date(startIso);
+        if (isNaN(start.getTime())) return startIso;
+        const day = DAY_FMT.format(start);
+        const startT = TIME_FMT.format(start);
+        if (!endIso) return day + ' · ' + startT;
+        const end = new Date(endIso);
+        const endT = isNaN(end.getTime()) ? '' : TIME_FMT.format(end);
+        return day + ' · ' + startT + (endT ? '–' + endT : '');
     }
 
     function tierOf(tool) {

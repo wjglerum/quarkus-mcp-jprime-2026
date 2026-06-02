@@ -3,7 +3,6 @@ package nl.lunatech.jprime.mcp.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record SessionDto(
@@ -15,5 +14,5 @@ public record SessionDto(
         OffsetDateTime endsAt,
         boolean cancelled,
         String cancellationReason,
-        List<SpeakerRef> speakers
+        SpeakerRef speaker
 ) {}

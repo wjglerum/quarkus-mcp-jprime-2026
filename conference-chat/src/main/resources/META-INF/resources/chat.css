@@ -179,6 +179,44 @@ main { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 0; min-hei
 .bubble .muted { color: var(--fg-muted); font-size: 13px; }
 .bubble .note { color: var(--fg-muted); font-size: 13px; margin-bottom: 10px; }
 
+.session-summary {
+    margin-top: 8px;
+    display: grid;
+    gap: 6px;
+}
+.session-summary-head {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+}
+.session-row {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+.session-row.cancelled {
+    border-left-color: var(--red);
+    opacity: 0.7;
+}
+.session-row.cancelled .session-title { text-decoration: line-through; }
+.session-meta {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--amber);
+}
+.session-room {
+    margin-left: auto;
+    padding: 1px 8px; border-radius: 999px;
+    font-size: 10px; background: var(--surface);
+    color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.session-title { font-size: 14px; font-weight: 600; color: var(--fg); margin-top: 3px; }
+.session-sub { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+
 .tool-card {
     background: var(--bg);
     border: 1px solid var(--border);
