@@ -19,8 +19,6 @@
     <div class="status" id="status">
       <span class="dot live"></span>
       <span class="who" id="who">{me.name ?: me.subject}</span>
-      <span class="brand-sep">/</span>
-      <span class="mode-pill{#if mode != 'scripted'} llm{/if}" id="mode-pill">{mode}</span>
     </div>
   </header>
 
@@ -51,23 +49,6 @@
         </button>
         {/for}
       </div>
-
-      <h2 class="sidebar-title">Provider</h2>
-      <label class="provider-select-label" for="provider-select">LLM provider</label>
-      <select id="provider-select" class="provider-select">
-        {#for p in providers.providers}
-        <option value="{p.id}"{#if p.id == providers.active} selected{/if}{#if !p.available} disabled{/if}>{p.id}{#if p.model} / {p.model}{/if}{#if !p.available} (unavailable){/if}</option>
-        {/for}
-      </select>
-      <p class="mode-help" id="provider-help">scripted means no LLM is called; the deterministic intent matcher picks the tool.</p>
-
-      <h2 class="sidebar-title">Mode</h2>
-      <label class="mode-toggle">
-        <input type="checkbox" id="mode-llm"{#if mode != 'scripted'} checked{/if}{#if providers.active == 'scripted'} disabled{/if}>
-        <span class="mode-track"><span class="mode-knob"></span></span>
-        <span class="mode-label">Let the LLM pick the tool</span>
-      </label>
-      <p class="mode-help" id="mode-help">Default. Deterministic intent matcher.</p>
 
       <h2 class="sidebar-title">Identity</h2>
       <dl class="identity" id="identity">
@@ -116,14 +97,13 @@
 
   <footer class="page-footer">
     <span>Practical MCP Security in Action  /  jPrime 2026</span>
-    <span>conference-chat  /  <span id="footer-mode">{mode}</span></span>
+    <span>conference-chat  /  anthropic</span>
   </footer>
 
   <script>
     window.__ME__ = {
       subject: "{me.subject}",
-      name: "{me.name}",
-      provider: "{providers.active}"
+      name: "{me.name}"
     };
   </script>
 

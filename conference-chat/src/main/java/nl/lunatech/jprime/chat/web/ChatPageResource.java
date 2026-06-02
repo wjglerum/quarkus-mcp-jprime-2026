@@ -10,13 +10,10 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
-import nl.lunatech.jprime.chat.intent.IntentMatcher;
-import nl.lunatech.jprime.chat.llm.ProviderRegistry;
 import nl.lunatech.jprime.chat.security.JwtClaims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @Path("/")
@@ -31,26 +28,17 @@ public class ChatPageResource {
     JsonWebToken accessToken;
 
     @Inject
-    ProviderRegistry providers;
-
-    @Inject
     SecurityIdentity identity;
 
     @CheckedTemplate
     public static class Templates {
-        public static native TemplateInstance chat(Me me,
-                                                   List<IntentMatcher.QuickPrompt> quickPrompts,
-                                                   ProvidersView providers,
-                                                   String mode);
+        public static native TemplateInstance chat(Me me, List<QuickPrompts.QuickPrompt> quickPrompts);
     }
 
     @GET
     @Produces(MediaType.TEXT_HTML)
     public TemplateInstance index() {
-        Me me = buildMe();
-        ProvidersView pv = buildProvidersView();
-        String mode = pv.active();
-        return Templates.chat(me, IntentMatcher.quickPrompts(), pv, mode);
+        return Templates.chat(buildMe(), QuickPrompts.all());
     }
 
     private Me buildMe() {
@@ -61,15 +49,6 @@ public class ChatPageResource {
         String acr = JwtClaims.string(accessToken, "acr", "1");
         String amrDisplay = JwtClaims.joinedStringList(accessToken, "amr", "(none)");
         return new Me(subject, name, roles, rolesDisplay, acr, amrDisplay);
-    }
-
-    private ProvidersView buildProvidersView() {
-        Map<String, Object> snap = providers.snapshot();
-        String active = String.valueOf(snap.get("active"));
-        @SuppressWarnings("unchecked")
-        List<ProviderRegistry.ProviderInfo> list =
-                (List<ProviderRegistry.ProviderInfo>) snap.get("providers");
-        return new ProvidersView(active, list);
     }
 
     private String nameClaim() {
@@ -86,6 +65,4 @@ public class ChatPageResource {
                      String rolesDisplay,
                      String acr,
                      String amrDisplay) {}
-
-    public record ProvidersView(String active, List<ProviderRegistry.ProviderInfo> providers) {}
 }

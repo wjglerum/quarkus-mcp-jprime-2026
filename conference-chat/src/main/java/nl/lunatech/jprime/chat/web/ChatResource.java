@@ -1,5 +1,6 @@
 package nl.lunatech.jprime.chat.web;
 
+import dev.langchain4j.model.chat.ChatModel;
 import io.quarkus.oidc.IdToken;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -11,10 +12,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import nl.lunatech.jprime.chat.intent.IntentMatcher;
-import nl.lunatech.jprime.chat.intent.IntentMatcher.Intent;
 import nl.lunatech.jprime.chat.llm.LlmToolPlanner;
-import nl.lunatech.jprime.chat.llm.ProviderRegistry;
 import nl.lunatech.jprime.chat.security.JwtClaims;
 import nl.lunatech.jprime.chat.web.ToolDispatcher.ToolResult;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -37,16 +35,13 @@ public class ChatResource {
     JsonWebToken accessToken;
 
     @Inject
-    IntentMatcher matcher;
-
-    @Inject
     ToolDispatcher dispatcher;
 
     @Inject
-    ProviderRegistry providers;
+    LlmToolPlanner planner;
 
     @Inject
-    LlmToolPlanner planner;
+    ChatModel chatModel;
 
     @Inject
     SecurityIdentity identity;
@@ -60,37 +55,14 @@ public class ChatResource {
                 "name", nameClaim(),
                 "roles", roles,
                 "acr", JwtClaims.string(accessToken, "acr", "1"),
-                "amr", JwtClaims.stringList(accessToken, "amr"),
-                "provider", providers.activeProvider(),
-                "llmAvailable", providers.isLlmActive()
+                "amr", JwtClaims.stringList(accessToken, "amr")
         );
     }
 
     @GET
     @Path("/quick-prompts")
-    public List<IntentMatcher.QuickPrompt> quickPrompts() {
-        return IntentMatcher.quickPrompts();
-    }
-
-    @GET
-    @Path("/providers")
-    public Map<String, Object> listProviders() {
-        return providers.snapshot();
-    }
-
-    @POST
-    @Path("/provider")
-    public Response setProvider(ProviderSwitchRequest req) {
-        if (req == null || req.provider() == null) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", "provider field required")).build();
-        }
-        ProviderRegistry.SwitchResult r = providers.setActive(req.provider());
-        if (!r.ok()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", r.error(), "active", r.active())).build();
-        }
-        return Response.ok(providers.snapshot()).build();
+    public List<QuickPrompts.QuickPrompt> quickPrompts() {
+        return QuickPrompts.all();
     }
 
     @POST
@@ -98,40 +70,18 @@ public class ChatResource {
     public Response send(ChatRequest req) {
         String prompt = req == null || req.prompt() == null ? "" : req.prompt().trim();
         if (prompt.isEmpty()) {
-            return Response.ok(ChatTurn.text("Type a prompt to get started.", providers.activeProvider())).build();
+            return Response.ok(ChatTurn.text("Type a prompt to get started.")).build();
         }
 
-        if ("llm".equalsIgnoreCase(req == null ? null : req.mode())) {
-            var chat = providers.activeChatModel();
-            if (chat.isEmpty()) {
-                return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                        .entity(Map.of("error", "provider_unavailable", "active", providers.activeProvider()))
-                        .build();
-            }
-            return Response.ok(runLlm(prompt, chat.get())).build();
-        }
-        return Response.ok(runScripted(prompt)).build();
-    }
-
-    private ChatTurn runScripted(String prompt) {
-        Intent intent = matcher.match(prompt);
-        if (!intent.matched()) {
-            return ChatTurn.text(intent.note(), "scripted");
-        }
-        ToolResult result = dispatcher.invoke(intent.tool(), intent.args());
-        return new ChatTurn(prompt, intent.note(), result, "scripted");
-    }
-
-    private ChatTurn runLlm(String prompt, dev.langchain4j.model.chat.ChatModel chat) {
-        LlmToolPlanner.Plan plan = planner.plan(chat, prompt);
+        LlmToolPlanner.Plan plan = planner.plan(chatModel, prompt);
         if (plan.error() != null) {
-            return new ChatTurn(prompt, plan.error(), null, "llm");
+            return Response.ok(new ChatTurn(prompt, plan.error(), null)).build();
         }
         if (!plan.hasTool()) {
-            return new ChatTurn(prompt, plan.note(), null, "llm");
+            return Response.ok(new ChatTurn(prompt, plan.note(), null)).build();
         }
         ToolResult result = dispatcher.invoke(plan.tool(), plan.args());
-        return new ChatTurn(prompt, plan.note(), result, "llm");
+        return Response.ok(new ChatTurn(prompt, plan.note(), result)).build();
     }
 
     private String nameClaim() {
@@ -142,13 +92,11 @@ public class ChatResource {
         return accessToken.getSubject();
     }
 
-    public record ChatRequest(String prompt, String mode) {}
+    public record ChatRequest(String prompt) {}
 
-    public record ProviderSwitchRequest(String provider) {}
-
-    public record ChatTurn(String prompt, String note, ToolResult result, String mode) {
-        public static ChatTurn text(String note, String mode) {
-            return new ChatTurn(null, note, null, mode);
+    public record ChatTurn(String prompt, String note, ToolResult result) {
+        public static ChatTurn text(String note) {
+            return new ChatTurn(null, note, null);
         }
     }
 }

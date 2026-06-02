@@ -4,75 +4,12 @@
     const transcript = document.getElementById('transcript');
     const composer = document.getElementById('composer');
     const promptInput = document.getElementById('prompt');
-    const modeToggle = document.getElementById('mode-llm');
-    const modePill = document.getElementById('mode-pill');
-    const footerMode = document.getElementById('footer-mode');
-    const modeHelp = document.getElementById('mode-help');
-    const providerSelect = document.getElementById('provider-select');
-    const providerHelp = document.getElementById('provider-help');
     const quickPromptsEl = document.getElementById('quick-prompts');
 
-    const me = window.__ME__ || { subject: 'unknown', name: 'unknown', provider: 'scripted' };
-    let activeProvider = me.provider || 'scripted';
-    let llmEnabled = activeProvider !== 'scripted';
+    const me = window.__ME__ || { subject: 'unknown', name: 'unknown' };
 
     const STEP_UP_TOOLS = new Set(['view_session_attendees', 'cancel_my_session']);
     const DESTRUCTIVE_TOOLS = new Set(['cancel_my_session']);
-
-    function updateModePill() {
-        const llm = modeToggle.checked && llmEnabled;
-        const label = llm ? activeProvider : 'scripted';
-        modePill.textContent = label;
-        modePill.classList.toggle('llm', llm);
-        if (footerMode) footerMode.textContent = label;
-    }
-
-    function refreshProviderUiFromSnapshot(snap) {
-        const providers = snap.providers || [];
-        activeProvider = snap.active || activeProvider;
-        providerSelect.innerHTML = '';
-        for (const p of providers) {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            const tag = p.available ? '' : ' (unavailable)';
-            const model = p.model ? ' / ' + p.model : '';
-            opt.textContent = p.id + model + tag;
-            opt.disabled = !p.available;
-            if (p.id === activeProvider) opt.selected = true;
-            providerSelect.appendChild(opt);
-        }
-        llmEnabled = activeProvider !== 'scripted';
-        modeToggle.disabled = !llmEnabled;
-        if (!llmEnabled) modeToggle.checked = false;
-        else modeToggle.checked = true;
-        updateModePill();
-    }
-
-    providerSelect.addEventListener('change', async () => {
-        const choice = providerSelect.value;
-        const res = await fetch('/api/chat/provider', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ provider: choice })
-        });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            providerHelp.textContent = 'Switch failed: ' + (err.error || res.status);
-            return;
-        }
-        const snap = await res.json();
-        providerHelp.textContent = 'Active provider: ' + (snap.active || choice) + '.';
-        refreshProviderUiFromSnapshot(snap);
-    });
-
-    modeToggle.addEventListener('change', () => {
-        updateModePill();
-        const llm = modeToggle.checked && llmEnabled;
-        modeHelp.textContent = llm
-            ? activeProvider + ' decides which tool to call. The MCP tools are passed in the request.'
-            : 'Default. Deterministic intent matcher.';
-    });
 
     quickPromptsEl.addEventListener('click', (ev) => {
         const btn = ev.target.closest('.quick-prompt');
@@ -94,21 +31,8 @@
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: text,
-                    mode: modeToggle.checked && llmEnabled ? 'llm' : 'scripted'
-                })
+                body: JSON.stringify({ prompt: text })
             });
-            if (res.status === 503) {
-                const body = await res.json().catch(() => ({}));
-                if (body && body.error === 'provider_unavailable') {
-                    addAssistantBubble({
-                        note: 'LLM provider unavailable. Switch back to scripted mode to continue.',
-                        result: { error: 'provider_unavailable', active: body.active }
-                    });
-                    return;
-                }
-            }
             if (!res.ok) {
                 addAssistantBubble({
                     note: 'Backend returned HTTP ' + res.status + '.',
@@ -213,6 +137,4 @@
             transcript.scrollTop = transcript.scrollHeight;
         });
     }
-
-    updateModePill();
 })();
