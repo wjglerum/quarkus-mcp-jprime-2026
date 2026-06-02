@@ -1070,25 +1070,6 @@
         "config": {}
       },
       {
-        "id": "35df5d38-b990-4fa5-9c83-a88f21e8f17b",
-        "name": "Trusted Hosts",
-        "providerId": "trusted-hosts",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {
-          "trusted-hosts": [
-            "localhost",
-            "127.0.0.1"
-          ],
-          "host-sending-registration-request-must-match": [
-            "false"
-          ],
-          "client-uris-must-match": [
-            "true"
-          ]
-        }
-      },
-      {
         "id": "f58862a7-a5fe-4d42-a616-d02dee96e112",
         "name": "Max Clients Limit",
         "providerId": "max-clients",
