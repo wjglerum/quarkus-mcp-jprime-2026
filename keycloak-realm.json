@@ -1082,11 +1082,15 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
+          "trusted-hosts": [
+            "localhost",
+            "127.0.0.1"
+          ],
           "host-sending-registration-request-must-match": [
             "true"
           ],
           "client-uris-must-match": [
-            "true"
+            "false"
           ]
         }
       },
