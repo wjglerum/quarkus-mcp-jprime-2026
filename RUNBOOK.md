@@ -55,7 +55,11 @@ Open `http://localhost:8080/audit-live/` on the second monitor.
 2. Log in as **attendee / attendee** (chat) or run DCR (Inspector).
 3. Ask: *"What's happening at jPrime right now?"* (calls `whats_on_now`).
 4. Ask: *"What should I see after the keynote on day 2?"* (calls `whats_next`).
-5. Show the URL bar mid-flow to highlight PKCE, then show the access token decoded in the inspector.
+5. Highlight PKCE: the `conference-chat` terminal logs a line on every login, e.g.
+   ```
+   PKCE on outbound authorization request: code_challenge_method=S256 code_challenge=E9Me...
+   ```
+   Point at it on the terminal (it survives the redirect, unlike the URL bar). Then show the access token decoded in the inspector.
 
 Talking points: **PKCE, DCR, why these matter for AI clients.**
 
