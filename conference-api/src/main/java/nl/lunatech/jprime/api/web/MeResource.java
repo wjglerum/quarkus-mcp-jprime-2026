@@ -14,7 +14,6 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import nl.lunatech.jprime.api.audit.AuditService;
-import nl.lunatech.jprime.api.clock.DemoClock;
 import nl.lunatech.jprime.api.domain.Attendee;
 import nl.lunatech.jprime.api.domain.Bookmark;
 import nl.lunatech.jprime.api.domain.Rating;
@@ -27,6 +26,8 @@ import nl.lunatech.jprime.api.dto.SessionDto;
 import nl.lunatech.jprime.api.dto.SessionFeedbackDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Path("/api/v1/me")
@@ -40,9 +41,6 @@ public class MeResource {
 
     @Inject
     AuditService audit;
-
-    @Inject
-    DemoClock clock;
 
     @GET
     @Transactional
@@ -73,7 +71,7 @@ public class MeResource {
         Bookmark b = new Bookmark();
         b.attendee = me;
         b.session = session;
-        b.createdAt = clock.now();
+        b.createdAt = OffsetDateTime.now(ZoneOffset.of("+03:00"));
         b.persist();
         audit.record("BOOKMARK_ADD", "session:" + session.id, session.title);
         return BookmarkDto.of(b);

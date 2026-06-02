@@ -22,7 +22,9 @@ public class AuditResource {
     @PermitAll
     public List<AuditEventDto> recent(@QueryParam("limit") Integer limit) {
         int lim = limit == null ? 30 : Math.max(1, Math.min(limit, 100));
-        return AuditEvent.<AuditEvent>find("order by createdAt desc")
+        // id desc as a tiebreak keeps newest-first deterministic even when many
+        // events share a timestamp.
+        return AuditEvent.<AuditEvent>find("order by createdAt desc, id desc")
                 .page(0, lim)
                 .list()
                 .stream()

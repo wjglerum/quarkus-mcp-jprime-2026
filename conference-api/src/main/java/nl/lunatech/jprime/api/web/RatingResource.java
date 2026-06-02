@@ -22,6 +22,9 @@ import nl.lunatech.jprime.api.dto.CreateRatingRequest;
 import nl.lunatech.jprime.api.dto.RatingDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 @Path("/api/v1/sessions/{id}/ratings")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed("attendee")
@@ -57,7 +60,7 @@ public class RatingResource {
             r = new Rating();
             r.attendee = me;
             r.session = session;
-            r.createdAt = clock.now();
+            r.createdAt = OffsetDateTime.now(ZoneOffset.of("+03:00"));
         }
         r.stars = req.stars();
         r.comment = req.comment();

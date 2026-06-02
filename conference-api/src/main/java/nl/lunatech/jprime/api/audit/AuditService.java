@@ -5,18 +5,16 @@ import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import nl.lunatech.jprime.api.clock.DemoClock;
 import nl.lunatech.jprime.api.domain.AuditEvent;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 @ApplicationScoped
 public class AuditService {
-
-    @Inject
-    DemoClock clock;
 
     @Inject
     JsonWebToken jwt;
@@ -40,7 +38,9 @@ public class AuditService {
         } else if (amr != null) {
             event.tokenAmr = String.valueOf(amr);
         }
-        event.createdAt = clock.now();
+        // Audit entries record when the action actually happened, in real time,
+        // independent of the simulated conference clock used for the schedule.
+        event.createdAt = OffsetDateTime.now(ZoneOffset.of("+03:00"));
         event.detail = detail;
         event.persist();
         Log.infof("AUDIT subject=%s action=%s target=%s acr=%s amr=%s",
