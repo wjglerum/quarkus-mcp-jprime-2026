@@ -49,6 +49,12 @@ public class AuditService {
 
     private String resolveSubject() {
         if (jwt != null) {
+            // Prefer the human-readable username over the opaque "sub" UUID so the audit
+            // trail attributes actions to a name (e.g. willem.jan), matching attendee records.
+            Object preferredUsername = jwt.getClaim("preferred_username");
+            if (preferredUsername != null && !String.valueOf(preferredUsername).isBlank()) {
+                return String.valueOf(preferredUsername);
+            }
             String sub = jwt.getSubject();
             if (sub != null && !sub.isBlank()) return sub;
         }
