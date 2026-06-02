@@ -18,16 +18,16 @@ import java.util.Random;
 public class DemoDataSeeder {
 
     private static final List<String[]> FAKE_PEOPLE = List.of(
-            new String[]{"attendee-alice",   "Alice Krasteva"},
-            new String[]{"attendee-bob",     "Bob Dimitrov"},
-            new String[]{"attendee-carla",   "Carla Petrova"},
-            new String[]{"attendee-dimo",    "Dimo Yankov"},
-            new String[]{"attendee-eva",     "Eva Stoyanova"},
-            new String[]{"attendee-filip",   "Filip Nikolov"},
-            new String[]{"attendee-galya",   "Galya Ivanova"},
-            new String[]{"attendee-hristo",  "Hristo Marinov"},
-            new String[]{"attendee-iva",     "Iva Georgieva"},
-            new String[]{"attendee-jordan",  "Jordan Petrov"}
+            new String[]{"attendee-alice",   "Alice Anderson"},
+            new String[]{"attendee-bob",     "Bob Brown"},
+            new String[]{"attendee-carol",   "Carol Clarke"},
+            new String[]{"attendee-dave",    "Dave Davies"},
+            new String[]{"attendee-erin",    "Erin Edwards"},
+            new String[]{"attendee-frank",   "Frank Foster"},
+            new String[]{"attendee-grace",   "Grace Green"},
+            new String[]{"attendee-heidi",   "Heidi Hughes"},
+            new String[]{"attendee-ivan",    "Ivan Irwin"},
+            new String[]{"attendee-judy",    "Judy Jones"}
     );
 
     private static final List<String> NICE_COMMENTS = List.of(
