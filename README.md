@@ -10,13 +10,67 @@
 | Path | What it is |
 |------|------------|
 | `conference-api/`   | Quarkus REST + Panache + Postgres. Owns the schedule, attendee agendas, ratings, and the audit log. Serves the live audit dashboard at `/audit-live`. |
-| `conference-mcp/`   | Quarkus MCP server (SSE). Exposes tools to AI clients and propagates the user OAuth token to `conference-api`. |
+| `conference-mcp/`   | Quarkus MCP server (streamable HTTP). Exposes tools to AI clients and propagates the user OAuth token to `conference-api`. |
 | `conference-chat/`  | Quarkus chat client. OIDC web-app login, LangChain4j MCP client to `conference-mcp`, Qute-rendered shell. |
 | `keycloak-realm.json` | Single shared realm export at the monorepo root. All three apps reference it via `../keycloak-realm.json`. |
 | `SPEC.md`           | Original build spec for the demo (canonical reference). |
 | `RUNBOOK.md`        | Stage-side runbook with the three-demo flow and the env vars to set. |
 
 No Docker compose file: every backing service is auto-provisioned by **Quarkus Dev Services**.
+
+## Architecture
+
+Three Quarkus apps share one Keycloak realm. Clients authenticate against Keycloak (chat via OIDC code flow + PKCE, MCP Inspector via DCR + PKCE), then call the MCP server with a Bearer token. The MCP server validates the token, then propagates it to `conference-api`, which enforces roles and writes the audit log.
+
+```mermaid
+graph LR
+  subgraph clients[Clients]
+    USR[Browser user]
+    INS[MCP Inspector]
+  end
+
+  CHAT["conference-chat :8082<br/>OIDC web app + LangChain4j MCP client"]
+  MCP["conference-mcp :8081<br/>MCP server + tools"]
+  API["conference-api :8080<br/>REST + Panache + audit + dashboard"]
+  KC[("Keycloak 26<br/>jprime realm")]
+  DB[("Postgres<br/>schedule, agendas, audit")]
+
+  USR -->|HTTPS| CHAT
+  INS -->|MCP streamable HTTP + Bearer| MCP
+  CHAT -->|MCP + propagated token| MCP
+  CHAT -->|OIDC code flow + PKCE| KC
+  INS -->|DCR + PKCE| KC
+  MCP -->|REST + propagated Bearer| API
+  MCP -.->|validate JWT| KC
+  API -.->|validate JWT| KC
+  API --> DB
+```
+
+The heart of the demo is token propagation: the same user token flows from the client, through the MCP tool call, into `conference-api`, where the action is authorized and audited under the user's identity, not the AI's.
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant C as Client (chat / Inspector)
+  participant KC as Keycloak
+  participant MCP as conference-mcp
+  participant API as conference-api
+  participant DB as Postgres
+
+  User->>C: "Bookmark the JSpecify talk"
+  Note over C,KC: First time only: PKCE (plus DCR for Inspector)
+  C->>KC: Authorization Code + PKCE
+  KC-->>C: Access token (roles, preferred_username)
+  C->>MCP: tools/call bookmark_session + Bearer
+  MCP->>KC: validate JWT
+  MCP->>API: POST /me/agenda + propagated Bearer
+  API->>API: enforce @RolesAllowed("attendee")
+  API->>DB: insert bookmark + audit_event
+  API-->>MCP: 200 OK
+  MCP-->>C: tool result
+  C-->>User: "Bookmarked."
+  Note over API,DB: audit_event attributed to preferred_username, not the AI
+```
 
 ## Run
 
