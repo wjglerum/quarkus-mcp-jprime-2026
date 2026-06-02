@@ -4,12 +4,14 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import nl.lunatech.jprime.api.domain.Attendee;
+import nl.lunatech.jprime.api.domain.AuditEvent;
 import nl.lunatech.jprime.api.domain.Bookmark;
 import nl.lunatech.jprime.api.domain.Rating;
 import nl.lunatech.jprime.api.domain.Session;
 import nl.lunatech.jprime.api.domain.Speaker;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -139,8 +141,55 @@ public class DemoDataSeeder {
             }
         }
 
-        Log.infof("Demo data: seeded %d attendees, %d bookmarks, %d ratings (%d on Willem Jan's sessions)",
-                attendees.size(), bookmarks, ratings + wjgRatings, wjgRatings);
+        int auditEvents = seedAuditTrail(willemJan, sessions);
+
+        Log.infof("Demo data: seeded %d attendees, %d bookmarks, %d ratings (%d on Willem Jan's sessions), %d audit events",
+                attendees.size(), bookmarks, ratings + wjgRatings, wjgRatings, auditEvents);
         return attendees.size();
+    }
+
+    /**
+     * Seed a representative audit trail so the live dashboard shows real activity on load,
+     * with varied tiers (public, step-up, destructive) for the second-screen demo. Real
+     * actions performed during the talk land on top of these.
+     */
+    private int seedAuditTrail(Speaker willemJan, List<Session> sessions) {
+        if (sessions.isEmpty()) return 0;
+        long talkSid = sessions.stream()
+                .filter(s -> "Practical MCP Security in Action".equals(s.title))
+                .map(s -> s.id).findFirst().orElse(sessions.get(0).id);
+        long wjgSid = willemJan == null
+                ? talkSid
+                : Session.<Session>find("speaker.id", willemJan.id).<Session>firstResultOptional()
+                        .map(s -> s.id).orElse(talkSid);
+
+        String strongAcr = "urn:mace:incommon:iap:silver";
+        Object[][] trail = {
+                {"attendee-alice", "BOOKMARK_ADD", "session:" + talkSid, "1", "pwd", "Practical MCP Security in Action"},
+                {"attendee-bob", "BOOKMARK_ADD", "session:" + talkSid, "1", "pwd", "Practical MCP Security in Action"},
+                {"attendee-carol", "RATE_SESSION", "session:" + talkSid, "1", "pwd", "stars=5 comment=great use of caffeine"},
+                {"attendee-dave", "RATE_SESSION_REJECTED_NOT_STARTED", "session:" + wjgSid, "1", "pwd", "stars=4"},
+                {"attendee-erin", "BOOKMARK_REMOVE", "session:" + talkSid, "1", "pwd", null},
+                {"willem.jan", "VIEW_SESSION_ATTENDEES", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", "viewed attendee list"},
+                {"willem.jan", "CANCEL_SESSION_ATTEMPTED", "session:" + wjgSid, "1", "pwd", "step-up required"},
+                {"willem.jan", "CANCEL_SESSION", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", "reason=room change"},
+                {"willem.jan", "CANCEL_SESSION_UNDONE", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", "reason=back on track"},
+        };
+
+        OffsetDateTime base = OffsetDateTime.now(ZoneOffset.of("+03:00")).minusMinutes(12);
+        int n = 0;
+        for (Object[] row : trail) {
+            AuditEvent ev = new AuditEvent();
+            ev.attendeeSubject = (String) row[0];
+            ev.action = (String) row[1];
+            ev.target = (String) row[2];
+            ev.tokenAcr = (String) row[3];
+            ev.tokenAmr = (String) row[4];
+            ev.detail = (String) row[5];
+            ev.createdAt = base.plusSeconds(n * 70L);
+            ev.persist();
+            n++;
+        }
+        return n;
     }
 }
