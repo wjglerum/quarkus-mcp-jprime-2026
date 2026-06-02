@@ -279,12 +279,18 @@ main { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 0; min-hei
 .tool-stepup strong { color: var(--amber); display: block; margin-bottom: 4px; }
 .stepup-btn {
     display: inline-block; margin: 10px 0 2px;
-    padding: 7px 14px; border-radius: 6px;
-    background: var(--amber); color: var(--bg);
+    padding: 7px 14px; border-radius: 6px; border: none;
+    background: var(--amber); color: var(--bg); cursor: pointer;
     font-family: var(--font-sans); font-size: 13px; font-weight: 600;
     text-decoration: none;
 }
 .stepup-btn:hover { filter: brightness(1.08); }
+.stepup-btn:disabled { cursor: default; opacity: 0.6; filter: none; }
+.tool-stepup.done { border-color: var(--green, #6ad28e); color: var(--green, #6ad28e); }
+.tool-stepup.done strong { color: var(--green, #6ad28e); }
+.stepup-status {
+    margin: 8px 0 0; font-family: var(--font-sans); font-size: 13px; color: var(--fg);
+}
 .tool-stepup code { font-family: var(--font-mono); background: var(--surface); color: var(--fg); padding: 1px 5px; border-radius: 4px; }
 .tool-stepup .stepup-caption {
     margin: 8px 0 0; font-style: italic; color: var(--fg-muted); font-size: 13px;

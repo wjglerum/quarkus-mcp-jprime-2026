@@ -52,11 +52,11 @@
 
       <h2 class="sidebar-title">Identity</h2>
       <dl class="identity" id="identity">
-        <dt>subject</dt><dd class="amber">{me.subject}</dd>
-        <dt>name</dt><dd class="amber">{me.name}</dd>
-        <dt>roles</dt><dd>{me.rolesDisplay}</dd>
-        <dt>acr</dt><dd>{me.acr}</dd>
-        <dt>amr</dt><dd>{me.amrDisplay}</dd>
+        <dt>subject</dt><dd class="amber" data-bind="subject">{me.subject}</dd>
+        <dt>name</dt><dd class="amber" data-bind="name">{me.name}</dd>
+        <dt>roles</dt><dd data-bind="roles">{me.rolesDisplay}</dd>
+        <dt>acr</dt><dd data-bind="acr">{me.acr}</dd>
+        <dt>amr</dt><dd data-bind="amr">{me.amrDisplay}</dd>
       </dl>
 
       <h2 class="sidebar-title">Companion screens</h2>
@@ -133,9 +133,9 @@
       <div class="tool-error" data-bind-error data-bind="errorText"></div>
       <div class="tool-stepup" data-bind-stepup>
         <strong>Step-up required.</strong>
-        <span>The server replied <code>insufficient_user_authentication</code>. Authenticate with your one-time code, then send the prompt again.</span>
-        <a class="stepup-btn" href="/step-up">Authenticate with MFA</a>
-        <p class="stepup-caption">Server says: this tool needs MFA. Client re-authenticates at acr=silver. Done.</p>
+        <span>The server replied <code>insufficient_user_authentication</code>. Authenticate with your one-time code in the popup; the prompt is sent again automatically.</span>
+        <button type="button" class="stepup-btn" data-stepup>Authenticate with MFA</button>
+        <p class="stepup-caption">Server says: this tool needs MFA. Client re-authenticates at acr=silver in a popup, the chat stays put. Done.</p>
       </div>
     </div>
   </template>

@@ -19,13 +19,123 @@
         composer.requestSubmit();
     });
 
-    composer.addEventListener('submit', async (ev) => {
+    // --- MFA step-up -------------------------------------------------------
+    // The chat is a single-page app, so we never navigate it. Instead we open the OIDC
+    // step-up in a popup; once Keycloak completes the OTP, the callback rewrites the
+    // same-origin session cookie to acr=silver. The popup posts back, we refresh the shown
+    // identity and resend the prompt that needed MFA, all with the transcript intact.
+    let stepUp = null; // { win, btn, prompt, poll }
+
+    transcript.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-stepup]');
+        if (!btn) return;
+        ev.preventDefault();
+        openStepUp(btn);
+    });
+
+    function openStepUp(btn) {
+        if (stepUp && stepUp.win && !stepUp.win.closed) {
+            stepUp.win.focus();
+            return;
+        }
+        const w = 480, h = 720;
+        const left = window.screenX + Math.max(0, (window.outerWidth - w) / 2);
+        const top = window.screenY + Math.max(0, (window.outerHeight - h) / 2);
+        const win = window.open('/step-up', 'jprime-step-up',
+            'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
+        if (!win) {
+            setStepUpHint(btn, 'Popup blocked. Allow popups for this site, then try again.');
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Waiting for MFA…';
+        // If the user closes the popup without finishing, restore the button.
+        const poll = window.setInterval(() => {
+            if (stepUp && stepUp.win && stepUp.win.closed) resetStepUp();
+        }, 500);
+        stepUp = { win: win, btn: btn, prompt: btn.dataset.prompt || '', poll: poll };
+    }
+
+    window.addEventListener('message', (ev) => {
+        if (ev.origin !== window.location.origin) return;
+        if (!ev.data || ev.data.type !== 'step-up-complete') return;
+        completeStepUp();
+    });
+
+    async function completeStepUp() {
+        if (!stepUp) return;
+        const btn = stepUp.btn;
+        const prompt = stepUp.prompt;
+        if (stepUp.win && !stepUp.win.closed) stepUp.win.close();
+        window.clearInterval(stepUp.poll);
+        stepUp = null;
+
+        await refreshIdentity();
+
+        const box = btn.closest('.tool-stepup');
+        if (box) {
+            box.classList.add('done');
+            btn.remove();
+            const hint = box.querySelector('.stepup-status') || document.createElement('p');
+            hint.className = 'stepup-status';
+            hint.textContent = prompt
+                ? 'MFA complete (acr=silver). Resending the prompt…'
+                : 'MFA complete (acr=silver).';
+            if (!hint.isConnected) box.appendChild(hint);
+        }
+        if (prompt) sendPrompt(prompt);
+    }
+
+    function resetStepUp() {
+        if (!stepUp) return;
+        window.clearInterval(stepUp.poll);
+        if (stepUp.btn) {
+            stepUp.btn.disabled = false;
+            stepUp.btn.textContent = 'Authenticate with MFA';
+        }
+        stepUp = null;
+    }
+
+    function setStepUpHint(btn, text) {
+        const box = btn.closest('.tool-stepup');
+        if (!box) return;
+        let hint = box.querySelector('.stepup-status');
+        if (!hint) {
+            hint = document.createElement('p');
+            hint.className = 'stepup-status';
+            box.appendChild(hint);
+        }
+        hint.textContent = text;
+    }
+
+    async function refreshIdentity() {
+        try {
+            const res = await fetch('/api/me', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const me = await res.json();
+            setIdentity('acr', me.acr);
+            setIdentity('amr', me.amr);
+            setIdentity('roles', me.roles);
+        } catch (e) { /* leave the stale values shown */ }
+    }
+
+    function setIdentity(key, val) {
+        if (val == null) return;
+        const dd = document.querySelector('#identity [data-bind="' + key + '"]');
+        if (dd) dd.textContent = val;
+    }
+
+    composer.addEventListener('submit', (ev) => {
         ev.preventDefault();
         const text = promptInput.value.trim();
         if (!text) return;
+        promptInput.value = '';
+        sendPrompt(text);
+    });
+
+    async function sendPrompt(text) {
         clearHero();
         addUserBubble(text);
-        promptInput.value = '';
         try {
             const res = await fetch('/api/chat/send', {
                 method: 'POST',
@@ -48,7 +158,7 @@
                 result: { error: 'network' }
             });
         }
-    });
+    }
 
     function clearHero() {
         const hero = transcript.querySelector('.hero-empty');
@@ -103,6 +213,8 @@
 
         if (result.stepUpRequired) {
             stepUpBox.hidden = false;
+            // Remember the prompt so we can resend it once the popup upgrades the session.
+            stepUpBox.querySelector('[data-stepup]').dataset.prompt = turn.prompt || '';
             node.querySelector('[data-bind="toolResult"]').textContent =
                 JSON.stringify({ error: 'insufficient_user_authentication' }, null, 2);
         } else {
