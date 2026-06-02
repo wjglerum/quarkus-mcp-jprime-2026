@@ -49,6 +49,25 @@ Open `http://localhost:8080/audit-live/` on the second monitor.
 4. From the Dev UI Keycloak tile, copy the realm URL. Paste `http://<dev-keycloak-url>/.well-known/openid-configuration` into a browser tab and confirm 200.
 5. Hit `http://localhost:8082/` in a browser; log in as `attendee / attendee`. The Qute shell renders with the quick prompts.
 
+## MCP Inspector and Dynamic Client Registration (DCR)
+
+Point MCP Inspector at the streamable HTTP endpoint `http://localhost:8081/mcp` (not `/mcp/sse`; the SSE transport is deprecated in current Inspector builds). Use the **Guided** or **Quick OAuth Flow** in Inspector's Auth panel. The flow runs entirely off discovery: Inspector reads `/.well-known/oauth-protected-resource` from `conference-mcp`, finds the Keycloak realm, registers a fresh client via DCR, then runs PKCE and sends you to the Keycloak login.
+
+The `jprime` realm is deliberately configured for **open anonymous DCR** so Inspector can register with no pre-shared credentials. Keycloak ships four anonymous client-registration policies that each block or cripple a DCR client; all four have been cleared in `keycloak-realm.json`:
+
+| Removed/changed policy | Why it had to go |
+|------------------------|------------------|
+| Allowed Client Scopes | Rejected the `openid` scope Inspector always requests. |
+| Trusted Hosts | Rejected Inspector's hardcoded `github.com` `client_uri`, and the Docker gateway sender IP. |
+| Full Scope Disabled | Set `fullScopeAllowed=false`, stripping realm roles from the token (caused 403 on tool calls). |
+| Consent Required | Forced a consent prompt on every freshly registered client. |
+
+On top of that, the `basic` client scope carries `realm-roles` and `preferred_username` mappers. DCR clients only retain the `basic` scope, so without these the token would be claimless: no roles (tool authorization fails) and no username (audit events attributed to the `sub` UUID).
+
+Talking point: **"the AI got a token" is not "the AI got a useful token".** Keycloak strips scopes, roles, and identity from dynamically registered clients by default. Every claim the agent acts on has to be consciously engineered in.
+
+**Reconnect after any reload.** MCP sessions live in the `conference-mcp` process. Whenever it hot-reloads or restarts, Inspector's session id goes stale and every POST fails with `MCP error -32099: Streamable HTTP error: Error POSTing to endpoint (HTTP 404)`. Fix: click **Disconnect** then **Connect** in Inspector to re-run `initialize`. The OAuth token stays valid, so no re-login.
+
 ## Demo 1: Public schedule lookup (~8 min)
 
 1. Open the MCP client: the conference-chat browser at `http://localhost:8082/`, or MCP Inspector pointed at `http://localhost:8081/mcp`.
@@ -97,11 +116,25 @@ Talking points: **step-up is the spec-level answer to "OAuth is for humans". Sam
 
 | Symptom | Fix |
 |---------|-----|
-| MCP client cannot register | In the Dev UI Keycloak tile, click "Restart"; refresh the DCR endpoint URL. |
+| Inspector: `-32099 ... Error POSTing to endpoint (HTTP 404)` | Stale MCP session after a `conference-mcp` reload. Disconnect then Connect in Inspector to get a fresh session. |
+| Inspector DCR fails (rejected policy, 403 on tools, or claimless token) | The running Keycloak is using a stale realm. Recycle it so the realm re-imports (see "Reload the realm" below). |
 | `whats_on_now` returns nothing | Confirm `DEMO_NOW` env var is set, then `q` and restart `conference-api`. |
 | Audit dashboard frozen | Hard refresh the browser tab; the poll is every 2 seconds. |
 | Audit log shows stale rehearsal data | `docker rm -f` the Dev Services Postgres container and restart `conference-api`. Hibernate `drop-and-create` plus the seeders give you a clean slate. |
 | Step-up flow does not prompt for TOTP | Expected: the realm does not ship a custom step-up flow. Show the 401 + `WWW-Authenticate` response and explain what a compliant client does next. |
+
+### Reload the realm
+
+Editing `keycloak-realm.json` has no effect until Keycloak re-imports it, and Dev Services **reuses** the shared Keycloak container across app restarts. To force a re-import, the container must be gone before any app starts:
+
+```bash
+# 1. Ctrl-C all three quarkus:dev processes.
+# 2. Remove the shared Keycloak container so Dev Services cannot reuse it:
+docker rm -f $(docker ps -aq --filter "label=quarkus-dev-service-keycloak=jprime-keycloak")
+# 3. Restart conference-api FIRST (it creates Keycloak and imports the realm), then mcp, then chat.
+```
+
+After this, reconnect Inspector so it registers a fresh DCR client against the new realm (the previously cached client id no longer exists).
 
 ## After the talk
 
