@@ -133,8 +133,9 @@
       <div class="tool-error" data-bind-error data-bind="errorText"></div>
       <div class="tool-stepup" data-bind-stepup>
         <strong>Step-up required.</strong>
-        <span>The server replied <code>insufficient_user_authentication</code>. Open the Keycloak login window, enter your TOTP code, then retry.</span>
-        <p class="stepup-caption">Server says: this tool needs MFA. Client re-authenticates. Done.</p>
+        <span>The server replied <code>insufficient_user_authentication</code>. Authenticate with your one-time code, then send the prompt again.</span>
+        <a class="stepup-btn" href="/step-up">Authenticate with MFA</a>
+        <p class="stepup-caption">Server says: this tool needs MFA. Client re-authenticates at acr=silver. Done.</p>
       </div>
     </div>
   </template>

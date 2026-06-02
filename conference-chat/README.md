@@ -21,7 +21,7 @@ Quarkus app on port 8082 that:
 
 The app waits for the shared Keycloak Dev Services container to come up, then
 listens on `http://localhost:8082/`. Anonymous requests redirect to Keycloak;
-log in as `attendee1 / attendee1` or `willem.jan / willem.jan`. Pre-seeded
+log in as `attendee / attendee` or `willem.jan / willem.jan`. Pre-seeded
 clients and users live in the monorepo-root `keycloak-realm.json`.
 
 Set `ANTHROPIC_API_KEY` so the model can run; without it the tool planner
@@ -81,7 +81,7 @@ to the Quarkus platform BOM.
 
 | Env var | Purpose | Default |
 |---------|---------|---------|
-| `CONFERENCE_MCP_URL` | MCP SSE endpoint. | `http://localhost:8081/mcp/sse` |
+| `CONFERENCE_MCP_URL` | MCP endpoint (streamable HTTP). | `http://localhost:8081/mcp` |
 | `ANTHROPIC_API_KEY` | Set as `quarkus.langchain4j.anthropic.api-key` to enable Claude. | unset |
 | `DEMO_NOW` | Override the demo clock used by `whats_on_now`. | `2026-06-03T10:45:00+03:00` in `%dev` |
 

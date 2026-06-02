@@ -42,7 +42,7 @@ All three apps share one Keycloak Dev Service. There is no `docker compose` file
    - LangChain4j chat model: Anthropic / OpenAI / Ollama (swappable)
 ]
             |
-            | MCP over SSE (Authorization: Bearer <user token>)
+            | MCP over streamable HTTP (Authorization: Bearer <user token>)
             v
 [ conference-mcp (Quarkus MCP Server, port 8081)
    - quarkus-mcp-server-http
@@ -229,7 +229,7 @@ Color rules (deck palette):
 
 ## conference-mcp: MCP tools
 
-Use `io.quarkiverse.mcp:quarkus-mcp-server-http`. SSE preferred because the wire is visible during the talk. Tools map closely to conference-api endpoints but are described in natural language for the LLM.
+Use `io.quarkiverse.mcp:quarkus-mcp-server-http`. Streamable HTTP preferred; the wire is still visible during the talk. Tools map closely to conference-api endpoints but are described in natural language for the LLM.
 
 Each tool has a name, an LLM-tuned description, an annotated parameter schema, and an implementation that calls conference-api through a REST client annotated with `@AccessToken` (so the user's bearer token rides along).
 
@@ -300,7 +300,7 @@ The user-facing surface on stage. Quarkus app on port 8082 that combines a brows
 ### Responsibilities
 
 1. **Authentication**: OIDC web-app flow with **PKCE S256**. Hitting `/` redirects to Keycloak. After login the user has a session cookie. The user's bearer token is reachable for outbound calls.
-2. **MCP client (real wire protocol)**: connects to `conference-mcp` at `http://localhost:8081/mcp/sse` via `quarkus-langchain4j-mcp`. Tool discovery happens at startup and every reconnect. **No direct REST calls to conference-api from the chat backend.** Every tool invocation is an MCP call so the protocol story on stage is honest.
+2. **MCP client (real wire protocol)**: connects to `conference-mcp` at `http://localhost:8081/mcp` via `quarkus-langchain4j-mcp`. Tool discovery happens at startup and every reconnect. **No direct REST calls to conference-api from the chat backend.** Every tool invocation is an MCP call so the protocol story on stage is honest.
 
    The chat backend resolves `session_query` to `session_id` over the MCP wire when an intent extracts a free-text session reference but the target tool (`bookmark_session`, `rate_session`, `view_session_attendees`, `cancel_my_session`, etc) needs a numeric id. The dispatcher first calls the MCP `list_sessions` tool with the query, takes the first hit's `id`, swaps it into args, then calls the target tool. The chain stays on MCP end-to-end. `session_query = "current"` short-circuits to `whats_on_now` first.
 
@@ -425,7 +425,7 @@ A LangChain4j `AiService` with the MCP tool provider attached. System prompt is 
   - `mcp-clients` -- public, allows Dynamic Client Registration. Used by MCP Inspector and any other MCP client.
 - **Realm roles vs client scopes**: `attendee` and `speaker` are realm **roles**, not client scopes. The realm ships no custom `attendee` / `speaker` client scopes; the roles ride into the access token via the realm-default `roles` scope and surface at the JWT path `realm_access/roles`. None of the three apps may set `quarkus.oidc.authentication.scopes=attendee,speaker` (or any other non-existent scope) -- Keycloak rejects the auth request with `Invalid scopes`. The only OIDC scope-related config that should appear is `quarkus.oidc.roles.role-claim-path=realm_access/roles` on each app. The realm's `realm roles` mapper writes `realm_access.roles` into the **access token only** (not the ID token). conference-api and conference-mcp run in `service` mode, so they read roles from the access token by default. conference-chat runs in `web-app` mode, where roles default to the ID token, so it must also set `quarkus.oidc.roles.source=accesstoken`; otherwise `SecurityIdentity.getRoles()` is empty and the identity panel shows no roles. Read roles from `SecurityIdentity.getRoles()`, not `JsonWebToken.getGroups()` (the latter reads the token `groups` claim, which the realm does not populate).
 - Users (seeded in the realm export):
-  - `attendee1` / `attendee1` -- role `attendee`.
+  - `attendee` / `attendee` -- role `attendee`.
   - `willem.jan` / `willem.jan` -- roles `attendee` + `speaker`, linked to the Willem Jan speaker fixture. **Not TOTP-enrolled in the seeded realm.**
   - `admin-demo` / `admin` -- roles `attendee` + `speaker`, full demo operator account.
 - Authentication flow: the realm uses Keycloak's default `browser` flow. There is no custom `browser-step-up` flow shipped with the realm. The step-up demo surfaces as a 401 + `WWW-Authenticate: Bearer error=insufficient_user_authentication, acr_values=urn:mace:incommon:iap:silver` from `conference-api` and a `ToolCallException("insufficient_user_authentication: ...")` from `conference-mcp`. The realm ships only the `acr.loa.map` entry (`urn:mace:incommon:iap:silver` -> level 2); wiring an actual ACR-gated OTP execution **and** enrolling TOTP on `willem.jan` is a manual pre-flight step the speaker performs via the Keycloak account console before the talk, not something the realm ships.
@@ -493,10 +493,10 @@ No emoji. No em dashes. Body font is system sans (Calibri fallback). Monospace i
 
 ### Demo 1: Public schedule lookup (~8 min)
 
-1. Open `http://localhost:8082/`. Get redirected to Keycloak. Log in as `attendee1 / attendee1`.
+1. Open `http://localhost:8082/`. Get redirected to Keycloak. Log in as `attendee / attendee`.
 2. Land in the chat UI. Click "What's happening right now?". The chat backend invokes `whats_on_now` on `conference-mcp` over real MCP. The result card shows the tool call and the response.
 3. Click "What's coming up next?".
-4. Open a second tab on `http://localhost:6274/` (MCP Inspector) and walk through Dynamic Client Registration against `http://localhost:8081/mcp/sse`. Show the audience the PKCE code in the URL bar.
+4. Open a second tab on `http://localhost:6274/` (MCP Inspector) and walk through Dynamic Client Registration against `http://localhost:8081/mcp`. Show the audience the PKCE code in the URL bar.
 
 Talking points: PKCE, DCR, why these matter for AI clients.
 
@@ -587,7 +587,7 @@ No Flyway. Hibernate owns the schema in dev and test (`drop-and-create`). In pro
 |---------|---------|---------|
 | `DEMO_NOW` | Override the demo clock used by `whats_on_now`/`whats_next` and the rating cutoff. ISO with `+03:00` zone. In `%dev` the default is **`2026-06-03T10:45:00+03:00`** (mid-demo Wednesday morning) so ratings work without env setup. Override only when rehearsing other times. | `2026-06-03T10:45:00+03:00` in dev, unset elsewhere |
 | `CONFERENCE_API_URL` | Where conference-mcp / conference-chat find conference-api. | `http://localhost:8080` |
-| `CONFERENCE_MCP_URL` | Where conference-chat finds the MCP SSE endpoint. | `http://localhost:8081/mcp/sse` |
+| `CONFERENCE_MCP_URL` | Where conference-chat finds the MCP endpoint (streamable HTTP). | `http://localhost:8081/mcp` |
 | `ANTHROPIC_API_KEY` | Anthropic provider key. | unset (provider disabled) |
 | `OPENAI_API_KEY` | OpenAI provider key. | unset (provider disabled) |
 | `CHAT_LLM_PROVIDER` | Initial provider on boot: `scripted`, `anthropic`, `openai`, `ollama`. | `scripted` |
@@ -656,7 +656,7 @@ Scenarios that must pass:
 
 1. Anonymous request to `/` redirects to Keycloak; `#username` and `#kc-login` are visible.
 2. Logging in as `willem.jan / willem.jan` lands on the Qute-rendered shell. The identity panel shows `willem.jan` + `attendee` + `speaker`. The slide-19 hero shows three rows: `Who.`, `What.`, `Provable.`
-3. Logging in as `attendee1` shows the server-rendered quick-prompt list with at least one `data-tier="step-up"` button.
+3. Logging in as `attendee` shows the server-rendered quick-prompt list with at least one `data-tier="step-up"` button.
 
 Run with `./mvnw test` inside `conference-chat`. The first run downloads Chromium via Playwright; subsequent runs reuse the cache.
 
@@ -707,10 +707,10 @@ Each scaffolded app ships an `AGENTS.md` (with a `CLAUDE.md` pointer) that enfor
 The demo is ready for the stage when, from the monorepo root, `./mvnw verify` is green and the three apps boot with `./mvnw quarkus:dev` in their own directories:
 
 - **conference-api** on port 8080: `GET /api/v1/sessions` returns the seeded schedule, `GET /audit-live/` serves the dashboard, `GET /q/health/ready` is UP.
-- **conference-mcp** on port 8081: `GET /q/health/ready` is UP (and its check confirms conference-api is reachable), `GET /mcp/sse` accepts an SSE connection.
+- **conference-mcp** on port 8081: `GET /q/health/ready` is UP (and its check confirms conference-api is reachable), `GET /mcp` accepts a streamable HTTP connection.
 - **conference-chat** on port 8082: `GET /` redirects to Keycloak, `GET /api/chat/quick-prompts` returns 401 anonymously and 200 with a session, `GET /q/health/ready` reports the MCP tool listing succeeded.
 
-Single shared Keycloak realm at `./keycloak-realm.json` with the four clients (`conference-api`, `conference-mcp`, `conference-chat`, `mcp-clients`) and three users (`attendee1`, `willem.jan`, `admin-demo`). PKCE S256 on every confidential client. Health checks, READMEs per app, and a top-level `RUNBOOK.md` with the demo flow.
+Single shared Keycloak realm at `./keycloak-realm.json` with the four clients (`conference-api`, `conference-mcp`, `conference-chat`, `mcp-clients`) and three users (`attendee`, `willem.jan`, `admin-demo`). PKCE S256 on every confidential client. Health checks, READMEs per app, and a top-level `RUNBOOK.md` with the demo flow.
 
 ## Visual reference (deck to UI mapping)
 

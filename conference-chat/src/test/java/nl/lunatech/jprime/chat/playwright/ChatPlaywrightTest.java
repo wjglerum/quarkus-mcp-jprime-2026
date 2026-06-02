@@ -87,12 +87,12 @@ class ChatPlaywrightTest {
     }
 
     @Test
-    void attendee1LoginRendersQuickPromptsWithStepUpTier() {
+    void attendeeLoginRendersQuickPromptsWithStepUpTier() {
         Page page = freshPage();
         page.navigate(chatBase.toString());
         page.waitForURL("**/realms/jprime/protocol/openid-connect/auth**");
-        page.locator("#username").fill("attendee1");
-        page.locator("#password").fill("attendee1");
+        page.locator("#username").fill("attendee");
+        page.locator("#password").fill("attendee");
         page.locator("#kc-login").click();
 
         page.waitForURL("**" + chatBase.getHost() + ":" + chatBase.getPort() + "/**");

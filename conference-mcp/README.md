@@ -5,7 +5,7 @@ conference tools to AI clients, secured with OIDC and propagates the user's
 bearer token to `conference-api`.
 
 - Port: 8081
-- MCP SSE endpoint: `http://localhost:8081/mcp/sse`
+- MCP endpoint (streamable HTTP): `http://localhost:8081/mcp`
 - Health: `GET /q/health/ready`
 
 Start in dev mode via the Quarkus Agent MCP plugin. Dev Services provisions a

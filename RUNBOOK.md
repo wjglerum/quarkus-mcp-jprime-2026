@@ -45,14 +45,14 @@ Open `http://localhost:8080/audit-live/` on the second monitor.
 
 1. `curl http://localhost:8080/api/v1/sessions | jq '.[0]'` returns a real session.
 2. The audit dashboard shows "Waiting for the first event..." (clean state) or a recent rehearsal event.
-3. Open the Dev UI at `http://localhost:8080/q/dev/` and click the **Keycloak** tile. Confirm realm `jprime` is imported with `attendee1`, `willem.jan`, and `admin-demo`.
+3. Open the Dev UI at `http://localhost:8080/q/dev/` and click the **Keycloak** tile. Confirm realm `jprime` is imported with `attendee`, `willem.jan`, and `admin-demo`.
 4. From the Dev UI Keycloak tile, copy the realm URL. Paste `http://<dev-keycloak-url>/.well-known/openid-configuration` into a browser tab and confirm 200.
-5. Hit `http://localhost:8082/` in a browser; log in as `attendee1 / attendee1`. The Qute shell renders with the quick prompts.
+5. Hit `http://localhost:8082/` in a browser; log in as `attendee / attendee`. The Qute shell renders with the quick prompts.
 
 ## Demo 1: Public schedule lookup (~8 min)
 
-1. Open the MCP client: the conference-chat browser at `http://localhost:8082/`, or MCP Inspector pointed at `http://localhost:8081/mcp/sse`.
-2. Log in as **attendee1 / attendee1** (chat) or run DCR (Inspector).
+1. Open the MCP client: the conference-chat browser at `http://localhost:8082/`, or MCP Inspector pointed at `http://localhost:8081/mcp`.
+2. Log in as **attendee / attendee** (chat) or run DCR (Inspector).
 3. Ask: *"What's happening at jPrime right now?"* (calls `whats_on_now`).
 4. Ask: *"What should I see after the keynote on day 2?"* (calls `whats_next`).
 5. Show the URL bar mid-flow to highlight PKCE, then show the access token decoded in the inspector.

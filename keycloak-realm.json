@@ -143,12 +143,12 @@
   "webAuthnPolicyPasswordlessExtraOrigins": [],
   "users": [
     {
-      "username": "attendee1",
+      "username": "attendee",
       "enabled": true,
       "emailVerified": true,
-      "email": "attendee1@example.com",
+      "email": "attendee@example.com",
       "firstName": "Attendee",
-      "lastName": "One",
+      "lastName": "Demo",
       "realmRoles": [
         "attendee",
         "default-roles-jprime"
@@ -156,7 +156,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "attendee1",
+          "value": "attendee",
           "temporary": false
         }
       ]
@@ -178,6 +178,12 @@
           "type": "password",
           "value": "willem.jan",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "jPrime demo authenticator",
+          "secretData": "{\"value\":\"jprimemcp2026stepupseed\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
         }
       ]
     },
@@ -1183,6 +1189,108 @@
   "internationalizationEnabled": false,
   "authenticationFlows": [
     {
+      "alias": "Browser Stepup",
+      "description": "Browser flow with Level-of-Assurance step-up: password at LoA1, OTP at LoA2",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "Stepup Forms",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Stepup Forms",
+      "description": "Username/password (LoA1) then OTP (LoA2), selected by the requested acr",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "autheticatorFlow": true,
+          "flowAlias": "Stepup LoA1",
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "Stepup LoA2",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Stepup LoA1",
+      "description": "Level of Assurance 1 - username and password",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorConfig": "stepup-loa1",
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Stepup LoA2",
+      "description": "Level of Assurance 2 - one-time password (step-up)",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorConfig": "stepup-loa2",
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
       "id": "2c1d1e26-a19f-412d-8206-2cddbc6e9f4e",
       "alias": "Account verification options",
       "description": "Method with which to verify the existing account",
@@ -1839,6 +1947,20 @@
   ],
   "authenticatorConfig": [
     {
+      "alias": "stepup-loa1",
+      "config": {
+        "loa-condition-level": "1",
+        "loa-max-age": "36000"
+      }
+    },
+    {
+      "alias": "stepup-loa2",
+      "config": {
+        "loa-condition-level": "2",
+        "loa-max-age": "300"
+      }
+    },
+    {
       "id": "754c9ffb-e0b4-4df0-82a4-19037d53638b",
       "alias": "browser-conditional-credential",
       "config": {
@@ -1878,7 +2000,7 @@
       "config": {}
     }
   ],
-  "browserFlow": "browser",
+  "browserFlow": "Browser Stepup",
   "registrationFlow": "registration",
   "directGrantFlow": "direct grant",
   "resetCredentialsFlow": "reset credentials",
