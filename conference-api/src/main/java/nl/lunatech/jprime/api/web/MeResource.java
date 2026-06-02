@@ -27,10 +27,7 @@ import nl.lunatech.jprime.api.dto.SessionDto;
 import nl.lunatech.jprime.api.dto.SessionFeedbackDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 @Path("/api/v1/me")
 @Produces(MediaType.APPLICATION_JSON)
@@ -99,25 +96,10 @@ public class MeResource {
     @Transactional
     public List<SessionDto> conflicts() {
         Attendee me = attendees.currentAttendee();
-        List<Session> sessions = Bookmark.listByAttendee(me.id).stream()
+        List<Session> bookmarked = Bookmark.listByAttendee(me.id).stream()
                 .map(b -> b.session)
                 .toList();
-        Set<Long> overlapping = new LinkedHashSet<>();
-        for (int i = 0; i < sessions.size(); i++) {
-            for (int j = i + 1; j < sessions.size(); j++) {
-                Session a = sessions.get(i);
-                Session b = sessions.get(j);
-                if (a.overlaps(b)) {
-                    overlapping.add(a.id);
-                    overlapping.add(b.id);
-                }
-            }
-        }
-        List<SessionDto> out = new ArrayList<>();
-        for (Session s : sessions) {
-            if (overlapping.contains(s.id)) out.add(SessionDto.of(s));
-        }
-        return out;
+        return Session.overlapping(bookmarked).stream().map(SessionDto::of).toList();
     }
 
     @GET
@@ -135,13 +117,8 @@ public class MeResource {
     public List<SessionFeedbackDto> mySessionFeedback() {
         Attendee me = attendees.currentAttendee();
         if (me.speaker == null) return List.of();
-        List<Session> mine = Session.list(
-                "from Session s where s.speaker.id = ?1 order by s.startsAt",
-                me.speaker.id);
-        List<SessionFeedbackDto> out = new ArrayList<>();
-        for (Session s : mine) {
-            out.add(SessionFeedbackDto.of(s, Rating.listForSession(s.id)));
-        }
-        return out;
+        return Session.listForSpeaker(me.speaker.id).stream()
+                .map(s -> SessionFeedbackDto.of(s, Rating.listForSession(s.id)))
+                .toList();
     }
 }

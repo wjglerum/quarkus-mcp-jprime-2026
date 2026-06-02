@@ -2,12 +2,9 @@ package nl.lunatech.jprime.mcp.tools;
 
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
-import io.quarkiverse.mcp.server.ToolCallException;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.GenericType;
-import jakarta.ws.rs.core.Response;
 import nl.lunatech.jprime.mcp.api.MeConferenceApi;
 import nl.lunatech.jprime.mcp.dto.AttendeeBookmarkDto;
 import nl.lunatech.jprime.mcp.dto.CancelSessionRequest;
@@ -41,18 +38,7 @@ public class StepUpTools {
                     description = "Numeric session id owned by the authenticated speaker.",
                     required = true) Long sessionId) {
         stepUp.require();
-        try (Response r = me.sessionAttendees(sessionId)) {
-            if (r.getStatus() == 401) {
-                throw new ToolCallException(
-                        "insufficient_user_authentication: backend requires step-up. "
-                                + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver "
-                                + "and retry.");
-            }
-            if (r.getStatus() >= 400) {
-                throw new ToolCallException("backend_error: " + r.readEntity(String.class));
-            }
-            return r.readEntity(new GenericType<List<AttendeeBookmarkDto>>() {});
-        }
+        return me.sessionAttendees(sessionId);
     }
 
     @Tool(name = "cancel_my_session",

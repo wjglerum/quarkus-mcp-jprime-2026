@@ -37,4 +37,13 @@ public final class JwtClaims {
         List<String> parts = stringList(jwt, name);
         return parts.isEmpty() ? emptyText : String.join(", ", parts);
     }
+
+    /** Human-friendly display name: the id token's name, else preferred_username, else the subject. */
+    public static String displayName(JsonWebToken idToken, JsonWebToken accessToken) {
+        String name = string(idToken, "name");
+        if (name != null) return name;
+        String preferred = string(idToken, "preferred_username");
+        if (preferred != null) return preferred;
+        return accessToken.getSubject();
+    }
 }

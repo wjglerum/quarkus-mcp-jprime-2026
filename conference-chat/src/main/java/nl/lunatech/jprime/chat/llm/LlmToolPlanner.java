@@ -34,7 +34,8 @@ public class LlmToolPlanner {
             tools in one turn.
             """;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    @Inject
+    ObjectMapper mapper;
 
     @Inject
     ToolProvider mcpToolProvider;

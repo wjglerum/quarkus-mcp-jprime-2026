@@ -6,12 +6,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import nl.lunatech.jprime.mcp.api.PublicConferenceApi;
 import nl.lunatech.jprime.mcp.dto.SessionDto;
-import nl.lunatech.jprime.mcp.dto.SpeakerDto;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -37,20 +35,9 @@ public class PublicTools {
                             + "titles and abstracts.",
                     required = false) String query,
             @ToolArg(name = "speaker_name",
-                    description = "Optional speaker name (case-insensitive substring). Resolved "
-                            + "against the speakers list before filtering sessions.",
+                    description = "Optional speaker name (case-insensitive substring match).",
                     required = false) String speakerName) {
-        Long speakerId = null;
-        if (speakerName != null && !speakerName.isBlank()) {
-            String needle = speakerName.toLowerCase(Locale.ENGLISH);
-            speakerId = api.listSpeakers().stream()
-                    .filter(s -> s.name() != null
-                            && s.name().toLowerCase(Locale.ENGLISH).contains(needle))
-                    .map(SpeakerDto::id)
-                    .findFirst()
-                    .orElse(null);
-        }
-        return api.listSessions(speakerId, query);
+        return api.listSessions(null, speakerName, query);
     }
 
     @Tool(name = "get_session",

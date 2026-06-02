@@ -6,7 +6,6 @@ import io.quarkiverse.mcp.server.ToolCallException;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.Response;
 import nl.lunatech.jprime.mcp.api.MeConferenceApi;
 import nl.lunatech.jprime.mcp.dto.Acknowledgement;
 import nl.lunatech.jprime.mcp.dto.BookmarkDto;
@@ -46,10 +45,8 @@ public class AttendeeTools {
             @ToolArg(name = "session_id",
                     description = "Numeric session id to remove from the agenda.",
                     required = true) Long sessionId) {
-        try (Response r = me.removeBookmark(sessionId)) {
-            return new Acknowledgement(r.getStatus() < 300,
-                    "session " + sessionId + " removed from agenda");
-        }
+        me.removeBookmark(sessionId);
+        return new Acknowledgement(true, "session " + sessionId + " removed from agenda");
     }
 
     @Tool(name = "my_agenda",
@@ -86,19 +83,7 @@ public class AttendeeTools {
         if (stars == null || stars < 1 || stars > 5) {
             throw new ToolCallException("invalid_argument: stars must be between 1 and 5");
         }
-        try (Response r = me.rateSession(sessionId, new CreateRatingRequest(stars, comment))) {
-            if (r.getStatus() == 422) {
-                String body = r.readEntity(String.class);
-                throw new ToolCallException("rejected: "
-                        + (body != null && body.contains("session_not_started")
-                                ? "session_not_started"
-                                : body));
-            }
-            if (r.getStatus() >= 400) {
-                throw new ToolCallException("backend_error: " + r.readEntity(String.class));
-            }
-            return r.readEntity(RatingDto.class);
-        }
+        return me.rateSession(sessionId, new CreateRatingRequest(stars, comment));
     }
 
     @Tool(name = "my_ratings",

@@ -19,7 +19,7 @@ public class ConferenceApiHealthCheck implements HealthCheck {
     @Override
     public HealthCheckResponse call() {
         try {
-            int sessions = api.listSessions(null, null).size();
+            int sessions = api.listSessions(null, null, null).size();
             return HealthCheckResponse.named("conference-api")
                     .up()
                     .withData("sessions", sessions)

@@ -17,6 +17,7 @@ import nl.lunatech.jprime.api.clock.DemoClock;
 import nl.lunatech.jprime.api.domain.Attendee;
 import nl.lunatech.jprime.api.domain.Rating;
 import nl.lunatech.jprime.api.domain.Session;
+import nl.lunatech.jprime.api.dto.ApiError;
 import nl.lunatech.jprime.api.dto.CreateRatingRequest;
 import nl.lunatech.jprime.api.dto.RatingDto;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -40,18 +41,14 @@ public class RatingResource {
     @Transactional
     public Response rate(@PathParam("id") Long sessionId, @Valid CreateRatingRequest req) {
         if (req == null) throw new WebApplicationException("body required", 400);
-        if (req.stars() < 1 || req.stars() > 5) {
-            throw new WebApplicationException("stars must be between 1 and 5", 422);
-        }
         Session session = Session.findById(sessionId);
         if (session == null) throw new NotFoundException("session " + sessionId);
         if (session.startsAt.isAfter(clock.now())) {
             audit.record("RATE_SESSION_REJECTED_NOT_STARTED", "session:" + sessionId,
                     "stars=" + req.stars());
             return Response.status(422)
-                    .entity("{\"error\":\"session_not_started\",\"description\":"
-                            + "\"You cannot rate a session before it has started.\"}")
-                    .type(MediaType.APPLICATION_JSON)
+                    .entity(ApiError.of("session_not_started",
+                            "You cannot rate a session before it has started."))
                     .build();
         }
         Attendee me = attendees.currentAttendee();

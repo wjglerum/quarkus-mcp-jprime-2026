@@ -21,15 +21,9 @@ public class SpeakerResource {
     @GET
     @Transactional
     public List<SpeakerListDto> list() {
-        return Speaker.<Speaker>listAll().stream()
-                .sorted((a, b) -> a.name.compareToIgnoreCase(b.name))
-                .map(sp -> {
-                    List<SessionDto> sessions = Session.<Session>list(
-                                    "from Session s left join fetch s.speaker where s.speaker.id = ?1 order by s.startsAt",
-                                    sp.id)
-                            .stream().map(SessionDto::of).toList();
-                    return SpeakerListDto.of(sp, sessions);
-                })
+        return Speaker.<Speaker>list("order by lower(name)").stream()
+                .map(sp -> SpeakerListDto.of(sp,
+                        Session.listForSpeaker(sp.id).stream().map(SessionDto::of).toList()))
                 .toList();
     }
 }

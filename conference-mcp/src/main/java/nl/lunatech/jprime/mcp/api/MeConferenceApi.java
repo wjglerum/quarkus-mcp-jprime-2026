@@ -1,6 +1,8 @@
 package nl.lunatech.jprime.mcp.api;
 
+import io.quarkiverse.mcp.server.ToolCallException;
 import io.quarkus.oidc.token.propagation.common.AccessToken;
+import io.quarkus.rest.client.reactive.ClientExceptionMapper;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -10,6 +12,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import nl.lunatech.jprime.mcp.dto.AttendeeBookmarkDto;
 import nl.lunatech.jprime.mcp.dto.BookmarkDto;
 import nl.lunatech.jprime.mcp.dto.CancelSessionRequest;
 import nl.lunatech.jprime.mcp.dto.CreateBookmarkRequest;
@@ -38,7 +41,7 @@ public interface MeConferenceApi {
 
     @DELETE
     @Path("/me/agenda/{sessionId}")
-    Response removeBookmark(@PathParam("sessionId") Long sessionId);
+    void removeBookmark(@PathParam("sessionId") Long sessionId);
 
     @GET
     @Path("/me/conflicts")
@@ -46,7 +49,7 @@ public interface MeConferenceApi {
 
     @POST
     @Path("/sessions/{id}/ratings")
-    Response rateSession(@PathParam("id") Long sessionId, CreateRatingRequest req);
+    RatingDto rateSession(@PathParam("id") Long sessionId, CreateRatingRequest req);
 
     @GET
     @Path("/me/ratings")
@@ -58,9 +61,27 @@ public interface MeConferenceApi {
 
     @GET
     @Path("/sessions/{id}/attendees")
-    Response sessionAttendees(@PathParam("id") Long sessionId);
+    List<AttendeeBookmarkDto> sessionAttendees(@PathParam("id") Long sessionId);
 
     @POST
     @Path("/sessions/{id}/cancel")
     SessionDto cancelSession(@PathParam("id") Long sessionId, CancelSessionRequest req);
+
+    /**
+     * Translates non-2xx backend responses into MCP {@link ToolCallException}s with stable,
+     * LLM-friendly messages, so the tool methods can stay one-line delegations.
+     */
+    @ClientExceptionMapper
+    static RuntimeException toToolException(Response response) {
+        int status = response.getStatus();
+        if (status < 400) return null;
+        String body = response.readEntity(String.class);
+        return switch (status) {
+            case 401 -> new ToolCallException("insufficient_user_authentication: backend requires step-up. "
+                    + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver and retry.");
+            case 422 -> new ToolCallException("rejected: "
+                    + (body != null && body.contains("session_not_started") ? "session_not_started" : body));
+            default -> new ToolCallException("backend_error: " + body);
+        };
+    }
 }

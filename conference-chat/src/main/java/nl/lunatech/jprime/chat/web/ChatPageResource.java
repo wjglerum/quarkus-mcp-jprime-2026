@@ -43,20 +43,12 @@ public class ChatPageResource {
 
     private Me buildMe() {
         String subject = JwtClaims.string(accessToken, "preferred_username", accessToken.getSubject());
-        String name = nameClaim();
+        String name = JwtClaims.displayName(idToken, accessToken);
         Set<String> roles = identity.getRoles() == null ? Set.of() : identity.getRoles();
         String rolesDisplay = roles.isEmpty() ? "(none)" : String.join(", ", roles);
         String acr = JwtClaims.string(accessToken, "acr", "1");
         String amrDisplay = JwtClaims.joinedStringList(accessToken, "amr", "(none)");
         return new Me(subject, name, roles, rolesDisplay, acr, amrDisplay);
-    }
-
-    private String nameClaim() {
-        String name = JwtClaims.string(idToken, "name");
-        if (name != null) return name;
-        String pref = JwtClaims.string(idToken, "preferred_username");
-        if (pref != null) return pref;
-        return accessToken.getSubject();
     }
 
     public record Me(String subject,

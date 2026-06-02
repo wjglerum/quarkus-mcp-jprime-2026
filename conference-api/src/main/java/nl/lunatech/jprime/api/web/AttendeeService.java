@@ -8,7 +8,7 @@ import nl.lunatech.jprime.api.domain.Attendee;
 import nl.lunatech.jprime.api.domain.Speaker;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
-import java.util.Set;
+import java.util.Optional;
 
 @ApplicationScoped
 public class AttendeeService {
@@ -43,19 +43,21 @@ public class AttendeeService {
     }
 
     private String subjectFromJwt() {
-        if (jwt != null) {
-            Object preferredUsername = jwt.getClaim("preferred_username");
-            if (preferredUsername != null && !String.valueOf(preferredUsername).isBlank()) {
-                return String.valueOf(preferredUsername);
-            }
-            String sub = jwt.getSubject();
-            if (sub != null && !sub.isBlank()) return sub;
-        }
-        return identity.getPrincipal().getName();
+        return claim("preferred_username")
+                .or(() -> claim("sub"))
+                .orElseGet(() -> identity.getPrincipal().getName());
+    }
+
+    /** A non-blank string JWT claim, or empty if the token or claim is absent. */
+    private Optional<String> claim(String name) {
+        Object value = jwt == null ? null : jwt.getClaim(name);
+        if (value == null) return Optional.empty();
+        String s = String.valueOf(value);
+        return s.isBlank() ? Optional.empty() : Optional.of(s);
     }
 
     public boolean hasSpeakerRole() {
-        return roles().contains("speaker");
+        return identity.getRoles().contains("speaker");
     }
 
     public boolean hasStrongAcr() {
@@ -96,25 +98,8 @@ public class AttendeeService {
     }
 
     private String nameFromJwt() {
-        if (jwt != null) {
-            Object rawName = jwt.getClaim("name");
-            if (rawName != null) {
-                String name = String.valueOf(rawName);
-                if (!name.isBlank()) return name;
-            }
-            Object rawPreferred = jwt.getClaim("preferred_username");
-            if (rawPreferred != null) {
-                String preferred = String.valueOf(rawPreferred);
-                if (!preferred.isBlank()) return preferred;
-            }
-        }
-        return identity.getPrincipal().getName();
-    }
-
-    public Set<String> roles() {
-        if (identity != null) {
-            return identity.getRoles();
-        }
-        return jwt.getGroups();
+        return claim("name")
+                .or(() -> claim("preferred_username"))
+                .orElseGet(() -> identity.getPrincipal().getName());
     }
 }
