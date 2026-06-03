@@ -68,6 +68,74 @@ Talking point: **"the AI got a token" is not "the AI got a useful token".** Keyc
 
 **Reconnect after any reload.** MCP sessions live in the `conference-mcp` process. Whenever it hot-reloads or restarts, Inspector's session id goes stale and every POST fails with `MCP error -32099: Streamable HTTP error: Error POSTing to endpoint (HTTP 404)`. Fix: click **Disconnect** then **Connect** in Inspector to re-run `initialize`. The OAuth token stays valid, so no re-login.
 
+## MCP Inspector and Client ID Metadata Documents (CIMD)
+
+CIMD is the spec-preferred successor to DCR, introduced in the MCP 2025-11-25 authorization spec (SEP-991). Instead of registering a client by POSTing to a writeable registration endpoint, the client presents an HTTPS URL as its `client_id`. The authorization server fetches the client metadata document at that URL, validates the redirect URIs, and runs PKCE as normal. There is no registration record to create, store, or police.
+
+This demo ships a static client metadata document for MCP Inspector at:
+
+```
+conference-mcp/src/main/resources/META-INF/resources/cimd/mcp-inspector.json
+```
+
+served at `http://host.docker.internal:8081/cimd/mcp-inspector.json`. That same URL is the `client_id` value inside the document, so the two match exactly as the spec requires.
+
+### Why host.docker.internal
+
+Keycloak runs inside a Dev Services container and must fetch the metadata document itself. From inside the container the host is reachable as `host.docker.internal`. For the URL to resolve identically on the host where Inspector runs, add this line to `/etc/hosts` once:
+
+```
+127.0.0.1 host.docker.internal
+```
+
+### Enable CIMD on Keycloak
+
+CIMD is an experimental Keycloak feature (verified present in the Dev Services image, Keycloak 26.6.1), off by default. It is switched on through Dev Services with:
+
+```
+quarkus.keycloak.devservices.features=cimd
+```
+
+already present in all three `application.properties` files. Because Dev Services reuses the shared Keycloak container, the feature only takes effect after the container is recreated. If the running container predates this setting, recycle it with the "Reload the realm" procedure below, then restart the apps.
+
+Confirm the feature is live from the Keycloak startup log:
+
+```bash
+docker logs $(docker ps -q --filter "label=quarkus-dev-service-keycloak=jprime-keycloak") 2>&1 \
+  | grep -i "features enabled"
+# expect a line listing cimd, e.g. "Experimental features enabled: cimd:v1"
+```
+
+### Drive it from Inspector
+
+Point Inspector at `http://localhost:8081/mcp` as usual. In a CIMD-capable build, set the client id to the metadata URL rather than running DCR. Inspector sends the URL as `client_id`, Keycloak fetches the document (visible in the Keycloak log as an outbound GET for `/cimd/mcp-inspector.json`), then runs PKCE and the normal login.
+
+If the Inspector build on hand does not yet emit a URL `client_id`, drive the contrast manually and show the authorization request on the second screen:
+
+```bash
+KC=$(curl -s http://localhost:8081/.well-known/oauth-protected-resource | jq -r '.authorization_servers[0]')
+open "$KC/protocol/openid-connect/auth?response_type=code\
+&client_id=http://host.docker.internal:8081/cimd/mcp-inspector.json\
+&redirect_uri=http://localhost:6274/oauth/callback\
+&scope=openid&code_challenge=E9Me...&code_challenge_method=S256"
+```
+
+Watch the Keycloak log: it fetches the metadata document before rendering the login page.
+
+### DCR vs CIMD, the punchline
+
+The DCR section above had to clear four anonymous client-registration policies just to let Inspector register. None of them apply under CIMD, because nothing is being written:
+
+| Concern under DCR | Under CIMD |
+|-------------------|------------|
+| Allowed Client Scopes policy rejected the `openid` scope | No registration step, scope is requested at authorization time as normal |
+| Trusted Hosts policy rejected the `client_uri` and the sender IP | No registration call to police, the client identity is a document the server reads |
+| Full Scope Disabled stripped realm roles from the token | No DCR-specific stripping, the realm role and username mappers apply as usual |
+| Consent Required forced a prompt on each freshly registered client | No per-registration client object to attach consent to |
+| The open anonymous registration endpoint is a standing write surface | There is no writeable registration endpoint at all |
+
+Talking point: **DCR makes the authorization server keep a writeable door open, then asks you to bolt four locks onto it. CIMD removes the door. The client introduces itself with a URL the server reads, nothing is stored, and there is no registration surface to attack.**
+
 ## Demo 1: Public schedule lookup (~8 min)
 
 1. Open the MCP client: the conference-chat browser at `http://localhost:8082/`, or MCP Inspector pointed at `http://localhost:8081/mcp`.
@@ -80,7 +148,9 @@ Talking point: **"the AI got a token" is not "the AI got a useful token".** Keyc
    ```
    Point at it on the terminal (it survives the redirect, unlike the URL bar). Then show the access token decoded in the inspector.
 
-Talking points: **PKCE, DCR, why these matter for AI clients.**
+6. **Registration contrast.** Show how the Inspector got its client identity two ways. First DCR: the four policies you had to clear so Keycloak would accept a dynamically registered client (see the DCR section above). Then CIMD: the same Inspector identified by a URL `client_id`, with Keycloak fetching the metadata document and zero policy surgery (see the CIMD section above). Land the punchline: DCR keeps a writeable registration door open and asks you to lock it down, CIMD removes the door.
+
+Talking points: **PKCE, DCR, and CIMD as the spec-preferred successor, why client identity matters for AI clients.**
 
 The audit dashboard shows nothing yet (read-only tools do not audit). Tell the audience: "Read tools do not show up. That is on purpose. The audit log records intent, not curiosity."
 
@@ -118,6 +188,8 @@ Talking points: **step-up is the spec-level answer to "OAuth is for humans". Sam
 |---------|-----|
 | Inspector: `-32099 ... Error POSTing to endpoint (HTTP 404)` | Stale MCP session after a `conference-mcp` reload. Disconnect then Connect in Inspector to get a fresh session. |
 | Inspector DCR fails (rejected policy, 403 on tools, or claimless token) | The running Keycloak is using a stale realm. Recycle it so the realm re-imports (see "Reload the realm" below). |
+| CIMD: Keycloak does not fetch the metadata document, or `invalid_client` | The `cimd` feature is not active on the running container, or the container predates the `features=cimd` setting. Recycle Keycloak (see "Reload the realm"), then check the startup log for `features enabled: cimd`. |
+| CIMD: Keycloak cannot reach the metadata URL | `host.docker.internal` is not resolvable. Add `127.0.0.1 host.docker.internal` to `/etc/hosts` and confirm `curl http://host.docker.internal:8081/cimd/mcp-inspector.json` returns the document. |
 | `whats_on_now` returns nothing | Confirm `DEMO_NOW` env var is set, then `q` and restart `conference-api`. |
 | Audit dashboard frozen | Hard refresh the browser tab; the poll is every 2 seconds. |
 | Audit log shows stale rehearsal data | `docker rm -f` the Dev Services Postgres container and restart `conference-api`. Hibernate `drop-and-create` plus the seeders give you a clean slate. |
@@ -134,7 +206,7 @@ docker rm -f $(docker ps -aq --filter "label=quarkus-dev-service-keycloak=jprime
 # 3. Restart conference-api FIRST (it creates Keycloak and imports the realm), then mcp, then chat.
 ```
 
-After this, reconnect Inspector so it registers a fresh DCR client against the new realm (the previously cached client id no longer exists).
+After this, reconnect Inspector so it registers a fresh DCR client against the new realm (the previously cached client id no longer exists). This recycle is also what activates the `cimd` feature on a container that predates the `features=cimd` setting.
 
 ## After the talk
 
