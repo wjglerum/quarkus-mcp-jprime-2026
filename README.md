@@ -20,7 +20,7 @@ No Docker compose file: every backing service is auto-provisioned by **Quarkus D
 
 ## Architecture
 
-Three Quarkus apps share one Keycloak realm. Clients authenticate against Keycloak (chat via OIDC code flow + PKCE, MCP Inspector via DCR + PKCE), then call the MCP server with a Bearer token. The MCP server validates the token, then propagates it to `conference-api`, which enforces roles and writes the audit log.
+Three Quarkus apps share one Keycloak realm. Clients authenticate against Keycloak (chat via OIDC code flow + PKCE, MCP Inspector via DCR or CIMD + PKCE), then call the MCP server with a Bearer token. The MCP server validates the token, then propagates it to `conference-api`, which enforces roles and writes the audit log.
 
 ```mermaid
 graph LR
@@ -39,7 +39,7 @@ graph LR
   INS -->|MCP streamable HTTP + Bearer| MCP
   CHAT -->|MCP + propagated token| MCP
   CHAT -->|OIDC code flow + PKCE| KC
-  INS -->|DCR + PKCE| KC
+  INS -->|DCR or CIMD + PKCE| KC
   MCP -->|REST + propagated Bearer| API
   MCP -.->|validate JWT| KC
   API -.->|validate JWT| KC
@@ -71,6 +71,22 @@ sequenceDiagram
   C-->>User: "Bookmarked."
   Note over API,DB: audit_event attributed to preferred_username, not the AI
 ```
+
+## Client registration: DCR vs CIMD
+
+An AI client has to obtain an OAuth client identity before it can run PKCE. The demo shows both mechanisms the MCP authorization spec allows, against the same realm.
+
+**Dynamic Client Registration (DCR)** has the client POST to a writeable registration endpoint and get back a generated `client_id`. To make this work for MCP Inspector, the realm clears four anonymous registration policies (documented in [`RUNBOOK.md`](RUNBOOK.md)). The talking point: "the AI got a token" is not "the AI got a useful token", every scope, role, and claim has to be consciously engineered back in.
+
+**Client ID Metadata Documents (CIMD)**, the spec-preferred default since the MCP 2025-11-25 spec (SEP-991), drop the registration step entirely. The `client_id` is an HTTPS URL, and Keycloak fetches the client metadata document at that URL. The demo serves one at `conference-mcp/.../META-INF/resources/cimd/mcp-inspector.json`, enabled through Keycloak's experimental `cimd` feature (`quarkus.keycloak.devservices.features=cimd`).
+
+| | DCR | CIMD |
+|--|-----|------|
+| Client identity | Generated `client_id` from a registration call | An HTTPS URL that is the `client_id` |
+| Server state | A stored registration record per client | None, the document is fetched on demand |
+| Registration endpoint | Writeable, must be opened and policed | None |
+| Realm setup for this demo | Four anonymous policies cleared | One experimental feature flag enabled |
+| Spec status | Supported | Preferred default since 2025-11-25 |
 
 ## Run
 
@@ -106,7 +122,7 @@ Open the page on a secondary monitor and run the demos. New events appear within
 
 See [`RUNBOOK.md`](RUNBOOK.md) for the moment-by-moment script of the three live demos:
 
-1. **Public** browse the schedule. PKCE + DCR + Authorization Code Flow.
+1. **Public** browse the schedule. PKCE + Authorization Code Flow, with client identity via DCR and via CIMD.
 2. **Personal** agenda, ratings, conflicts. Token propagation, full audit.
 3. **Sensitive** speaker-only tools with step-up MFA. Server-driven challenge.
 

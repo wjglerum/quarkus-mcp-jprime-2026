@@ -1,0 +1,18 @@
+{
+  "client_id": "http://host.docker.internal:8081/cimd/mcp-inspector.json",
+  "client_name": "MCP Inspector (CIMD demo client)",
+  "client_uri": "https://github.com/modelcontextprotocol/inspector",
+  "redirect_uris": [
+    "http://localhost:6274/oauth/callback",
+    "http://localhost:6274/oauth/callback/debug"
+  ],
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "response_types": [
+    "code"
+  ],
+  "token_endpoint_auth_method": "none",
+  "scope": "openid"
+}
