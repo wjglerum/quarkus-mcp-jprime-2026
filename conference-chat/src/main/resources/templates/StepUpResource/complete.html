@@ -1,0 +1,26 @@
+{|<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MFA complete</title>
+  <style>
+    body { margin: 0; height: 100vh; display: grid; place-items: center;
+           font-family: system-ui, sans-serif; background: #11161c; color: #f2a65a; }
+    p { font-size: 15px; }
+  </style>
+</head>
+<body>
+  <p>MFA complete. You can close this window.</p>
+  <script>
+    (function () {
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'step-up-complete' }, window.location.origin);
+        }
+      } catch (e) { /* opener gone or cross-origin: fall through to close */ }
+      window.close();
+    })();
+  </script>
+</body>
+</html>
+|}

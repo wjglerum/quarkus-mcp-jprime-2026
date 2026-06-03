@@ -6,6 +6,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import nl.lunatech.jprime.api.domain.Attendee;
 import nl.lunatech.jprime.api.domain.Speaker;
+import nl.lunatech.jprime.api.security.Tokens;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import java.util.Optional;
@@ -61,23 +62,7 @@ public class AttendeeService {
     }
 
     public boolean hasStrongAcr() {
-        Object acr = jwt == null ? null : jwt.getClaim("acr");
-        if (acr != null) {
-            String acrStr = String.valueOf(acr);
-            if ("2".equals(acrStr) || "urn:mace:incommon:iap:silver".equals(acrStr)) {
-                return true;
-            }
-        }
-        Object amr = jwt == null ? null : jwt.getClaim("amr");
-        if (amr instanceof Iterable<?> it) {
-            for (Object o : it) {
-                String s = String.valueOf(o);
-                if ("mfa".equals(s) || "otp".equals(s)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return Tokens.hasStrongAcr(jwt);
     }
 
     private Attendee refreshFromToken(Attendee a) {

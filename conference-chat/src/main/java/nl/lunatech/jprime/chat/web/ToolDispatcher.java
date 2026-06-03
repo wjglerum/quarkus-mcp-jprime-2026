@@ -93,18 +93,15 @@ public class ToolDispatcher {
     public record ToolResult(String tool, Map<String, Object> args, Object result,
                               String error, boolean stepUpRequired) {
         public static ToolResult ok(String tool, Map<String, Object> args, Object result) {
-            return new ToolResult(tool, copy(args), result, null, false);
+            return new ToolResult(tool, args, result, null, false);
         }
         public static ToolResult err(String tool, Map<String, Object> args, String error) {
-            return new ToolResult(tool, copy(args), null, error, false);
+            return new ToolResult(tool, args, null, error, false);
         }
         public static ToolResult stepUp(String tool, Map<String, Object> args) {
-            return new ToolResult(tool, copy(args), null,
+            return new ToolResult(tool, args, null,
                     "insufficient_user_authentication: this tool requires step-up MFA",
                     true);
-        }
-        private static Map<String, Object> copy(Map<String, Object> a) {
-            return a == null ? Map.of() : new LinkedHashMap<>(a);
         }
     }
 }

@@ -16,6 +16,12 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 @ApplicationScoped
 public class SessionResolver {
 
+    public static final String SESSION_ID =
+            "Numeric session id. Provide this if you already know it.";
+    public static final String SESSION_QUERY =
+            "A few distinctive words from the talk title (e.g. 'MCP Security'), used to find the "
+                    + "session when the numeric id is unknown.";
+
     @Inject
     @RestClient
     PublicConferenceApi api;

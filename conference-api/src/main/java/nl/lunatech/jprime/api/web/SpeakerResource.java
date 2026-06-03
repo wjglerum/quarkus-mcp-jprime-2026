@@ -9,13 +9,11 @@ import nl.lunatech.jprime.api.domain.Session;
 import nl.lunatech.jprime.api.domain.Speaker;
 import nl.lunatech.jprime.api.dto.SessionDto;
 import nl.lunatech.jprime.api.dto.SpeakerListDto;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
 
 @Path("/api/v1/speakers")
 @Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "speakers", description = "Conference speakers")
 public class SpeakerResource {
 
     @GET

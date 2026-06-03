@@ -29,41 +29,28 @@ public class StepUpTools {
     SessionResolver sessions;
 
     @Tool(name = "view_session_attendees",
-            description = "List the attendees (display names) who bookmarked one of the "
-                    + "authenticated speaker's sessions. This exposes personal data and requires "
-                    + "recent MFA-backed authentication, also known as step-up. If the current "
-                    + "token does not satisfy the acr requirement, the tool returns an "
-                    + "`insufficient_user_authentication` error; the client must then "
-                    + "re-authenticate with `acr_values=urn:mace:incommon:iap:silver` and retry. "
-                    + "Tell the user that signing in again with a one-time code is needed.")
+            description = "List the display names of attendees who bookmarked one of the speaker's "
+                    + "sessions. Exposes personal data, so it requires recent MFA-backed step-up. If "
+                    + "the token does not satisfy the acr requirement, returns "
+                    + "`insufficient_user_authentication`; the client must re-authenticate with "
+                    + "`acr_values=urn:mace:incommon:iap:silver` and retry. Tell the user to sign in "
+                    + "again with a one-time code.")
     public List<AttendeeBookmarkDto> viewSessionAttendees(
-            @ToolArg(name = "session_id",
-                    description = "Numeric session id owned by the speaker. Provide this if known.",
-                    required = false) Long sessionId,
-            @ToolArg(name = "session_query",
-                    description = "A few distinctive words from the talk title, used when the "
-                            + "numeric id is unknown.",
-                    required = false) String sessionQuery) {
+            @ToolArg(name = "session_id", description = SessionResolver.SESSION_ID, required = false) Long sessionId,
+            @ToolArg(name = "session_query", description = SessionResolver.SESSION_QUERY, required = false) String sessionQuery) {
         stepUp.require();
         return me.sessionAttendees(sessions.resolve(sessionId, sessionQuery));
     }
 
     @Tool(name = "cancel_my_session",
-            description = "Mark one of the authenticated speaker's own sessions as cancelled, with "
-                    + "a recorded reason. Reversible: calling the tool again for the same session "
-                    + "toggles the cancellation off and records `CANCEL_SESSION_UNDONE`. Highly "
-                    + "destructive in intent, so it requires recent MFA-backed authentication "
-                    + "(step-up). Identify the talk with session_query when you do not have the "
-                    + "numeric id. Tell the user this action is fully audited and visible on the "
-                    + "live audit feed.")
+            description = "Mark one of the speaker's own sessions as cancelled, with a recorded "
+                    + "reason. Reversible: calling again toggles it off and records "
+                    + "`CANCEL_SESSION_UNDONE`. Destructive, so it requires MFA-backed step-up. Pass "
+                    + "session_query when you lack the id. Tell the user it is audited and visible on "
+                    + "the live audit feed.")
     public SessionDto cancelMySession(
-            @ToolArg(name = "session_id",
-                    description = "Numeric session id owned by the speaker. Provide this if known.",
-                    required = false) Long sessionId,
-            @ToolArg(name = "session_query",
-                    description = "A few distinctive words from the talk title, used when the "
-                            + "numeric id is unknown.",
-                    required = false) String sessionQuery,
+            @ToolArg(name = "session_id", description = SessionResolver.SESSION_ID, required = false) Long sessionId,
+            @ToolArg(name = "session_query", description = SessionResolver.SESSION_QUERY, required = false) String sessionQuery,
             @ToolArg(name = "reason",
                     description = "Free-text reason recorded in the audit log.",
                     required = true) String reason) {

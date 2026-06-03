@@ -19,14 +19,12 @@ import nl.lunatech.jprime.api.domain.Session;
 import nl.lunatech.jprime.api.dto.AttendeeBookmarkDto;
 import nl.lunatech.jprime.api.dto.CancelSessionRequest;
 import nl.lunatech.jprime.api.dto.SessionDto;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
 
 @Path("/api/v1/sessions/{id}")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed("speaker")
-@Tag(name = "speaker-actions", description = "Sensitive speaker-only endpoints (require step-up)")
 public class SpeakerSessionResource {
 
     @Inject

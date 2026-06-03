@@ -6,12 +6,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import nl.lunatech.jprime.api.domain.AuditEvent;
+import nl.lunatech.jprime.api.security.Tokens;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 @ApplicationScoped
 public class AuditService {
@@ -28,16 +27,8 @@ public class AuditService {
         event.attendeeSubject = resolveSubject();
         event.action = action;
         event.target = target;
-        Object acr = jwt == null ? null : jwt.getClaim("acr");
-        event.tokenAcr = acr == null ? null : String.valueOf(acr);
-        Object amr = jwt == null ? null : jwt.getClaim("amr");
-        if (amr instanceof Iterable<?> it) {
-            event.tokenAmr = StreamSupport.stream(it.spliterator(), false)
-                    .map(String::valueOf)
-                    .collect(Collectors.joining(","));
-        } else if (amr != null) {
-            event.tokenAmr = String.valueOf(amr);
-        }
+        event.tokenAcr = Tokens.acr(jwt);
+        event.tokenAmr = Tokens.amr(jwt);
         // Audit entries record when the action actually happened, in real time,
         // independent of the simulated conference clock used for the schedule.
         event.createdAt = OffsetDateTime.now(ZoneOffset.of("+03:00"));

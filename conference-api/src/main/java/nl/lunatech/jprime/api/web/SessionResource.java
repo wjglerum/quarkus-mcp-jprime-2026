@@ -11,13 +11,11 @@ import jakarta.ws.rs.core.MediaType;
 import nl.lunatech.jprime.api.clock.DemoClock;
 import nl.lunatech.jprime.api.domain.Session;
 import nl.lunatech.jprime.api.dto.SessionDto;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
 
 @Path("/api/v1/sessions")
 @Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "sessions", description = "Public conference schedule")
 public class SessionResource {
 
     @Inject

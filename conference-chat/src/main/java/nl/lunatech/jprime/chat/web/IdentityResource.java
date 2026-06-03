@@ -1,17 +1,12 @@
 package nl.lunatech.jprime.chat.web;
 
-import io.quarkus.oidc.IdToken;
 import io.quarkus.security.Authenticated;
-import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
-import nl.lunatech.jprime.chat.security.JwtClaims;
-import org.eclipse.microprofile.jwt.JsonWebToken;
-
-import java.util.Set;
+import nl.lunatech.jprime.chat.security.CurrentUser;
 
 /**
  * Returns the caller's current identity as JSON. The chat fetches this after a step-up popup
@@ -24,24 +19,11 @@ import java.util.Set;
 public class IdentityResource {
 
     @Inject
-    @IdToken
-    JsonWebToken idToken;
-
-    @Inject
-    JsonWebToken accessToken;
-
-    @Inject
-    SecurityIdentity identity;
+    CurrentUser me;
 
     @GET
     public Me me() {
-        String subject = JwtClaims.string(accessToken, "preferred_username", accessToken.getSubject());
-        String name = JwtClaims.displayName(idToken, accessToken);
-        Set<String> roles = identity.getRoles() == null ? Set.of() : identity.getRoles();
-        String rolesDisplay = roles.isEmpty() ? "(none)" : String.join(", ", roles);
-        String acr = JwtClaims.string(accessToken, "acr", "1");
-        String amr = JwtClaims.joinedStringList(accessToken, "amr", "(none)");
-        return new Me(subject, name, rolesDisplay, acr, amr);
+        return new Me(me.subject(), me.name(), me.rolesDisplay(), me.acr(), me.amrDisplay());
     }
 
     public record Me(String subject, String name, String roles, String acr, String amr) {}
