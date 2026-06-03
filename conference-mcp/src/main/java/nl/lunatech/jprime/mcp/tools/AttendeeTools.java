@@ -29,72 +29,48 @@ public class AttendeeTools {
     SessionResolver sessions;
 
     @Tool(name = "bookmark_session",
-            description = "Add a session to the authenticated attendee's personal agenda. The "
-                    + "bookmark is recorded under the user's identity and audited. Use this when "
-                    + "the user says they want to attend, save, or pin a talk. Identify the talk "
-                    + "with session_query (a few words of the title) when you do not already have "
-                    + "the numeric id; do not call another tool first to look it up. Returns the "
-                    + "new bookmark with the embedded session details.")
+            description = "Add a session to the attendee's personal agenda, recorded under their "
+                    + "identity and audited. Use when the user wants to attend, save, or pin a talk. "
+                    + "Pass session_query directly when you do not have the id; do not look it up first.")
     public BookmarkDto bookmarkSession(
-            @ToolArg(name = "session_id",
-                    description = "Numeric session id. Provide this if you already know it.",
-                    required = false) Long sessionId,
-            @ToolArg(name = "session_query",
-                    description = "A few distinctive words from the talk title (e.g. 'MCP Security'), "
-                            + "used to find the session when the numeric id is unknown.",
-                    required = false) String sessionQuery) {
+            @ToolArg(name = "session_id", description = SessionResolver.SESSION_ID, required = false) Long sessionId,
+            @ToolArg(name = "session_query", description = SessionResolver.SESSION_QUERY, required = false) String sessionQuery) {
         return me.addBookmark(new CreateBookmarkRequest(sessions.resolve(sessionId, sessionQuery)));
     }
 
     @Tool(name = "unbookmark_session",
-            description = "Remove a session from the authenticated attendee's personal agenda. "
-                    + "Idempotent: returns success even if the bookmark was already gone. Use this "
-                    + "when the user wants to drop, unsave, or remove a talk from their schedule. "
-                    + "Identify the talk with session_query when you do not have the numeric id.")
+            description = "Remove a session from the attendee's agenda. Idempotent. Use when the user "
+                    + "wants to drop, unsave, or remove a talk. Pass session_query when you lack the id.")
     public Acknowledgement unbookmarkSession(
-            @ToolArg(name = "session_id",
-                    description = "Numeric session id. Provide this if you already know it.",
-                    required = false) Long sessionId,
-            @ToolArg(name = "session_query",
-                    description = "A few distinctive words from the talk title, used when the "
-                            + "numeric id is unknown.",
-                    required = false) String sessionQuery) {
+            @ToolArg(name = "session_id", description = SessionResolver.SESSION_ID, required = false) Long sessionId,
+            @ToolArg(name = "session_query", description = SessionResolver.SESSION_QUERY, required = false) String sessionQuery) {
         long id = sessions.resolve(sessionId, sessionQuery);
         me.removeBookmark(id);
         return new Acknowledgement(true, "session " + id + " removed from agenda");
     }
 
     @Tool(name = "my_agenda",
-            description = "List the sessions currently on the authenticated attendee's personal "
-                    + "agenda, ordered by start time. Use this when the user asks for their "
-                    + "agenda, schedule, plan, or bookmarks for the conference.")
+            description = "List the attendee's bookmarked sessions, ordered by start time. Use for "
+                    + "their agenda, schedule, plan, or bookmarks.")
     public List<BookmarkDto> myAgenda() {
         return me.myAgenda();
     }
 
     @Tool(name = "my_conflicts",
-            description = "List bookmarked sessions that overlap in time. Use this when the user "
-                    + "asks whether their agenda has any conflicts, clashes, or double-bookings.")
+            description = "List bookmarked sessions that overlap in time. Use for conflicts, clashes, "
+                    + "or double-bookings.")
     public List<SessionDto> myConflicts() {
         return me.conflicts();
     }
 
     @Tool(name = "rate_session",
-            description = "Submit a 1 to 5 star rating with an optional comment for a session the "
-                    + "attendee attended. Recorded under the user's identity and fully audited. "
-                    + "To rate a talk by name, pass session_query with a few words of its title "
-                    + "(e.g. 'MCP Security') directly in this call; you do NOT need to look up the "
-                    + "id first. Stars must be between 1 and 5 (inclusive). The server refuses to "
-                    + "rate a session that has not started yet; this surfaces as a "
-                    + "`rejected: session_not_started` error.")
+            description = "Submit a 1 to 5 star rating with an optional comment, recorded under the "
+                    + "user's identity and audited. Pass session_query directly to rate by name; do "
+                    + "not look up the id first. The server rejects rating a session that has not "
+                    + "started yet with `rejected: session_not_started`.")
     public RatingDto rateSession(
-            @ToolArg(name = "session_id",
-                    description = "Numeric session id. Provide this if you already know it.",
-                    required = false) Long sessionId,
-            @ToolArg(name = "session_query",
-                    description = "A few distinctive words from the talk title (e.g. 'MCP Security'), "
-                            + "used to find the session when the numeric id is unknown.",
-                    required = false) String sessionQuery,
+            @ToolArg(name = "session_id", description = SessionResolver.SESSION_ID, required = false) Long sessionId,
+            @ToolArg(name = "session_query", description = SessionResolver.SESSION_QUERY, required = false) String sessionQuery,
             @ToolArg(name = "stars",
                     description = "Star rating between 1 and 5 inclusive.",
                     required = true) Integer stars,
@@ -108,9 +84,8 @@ public class AttendeeTools {
     }
 
     @Tool(name = "my_ratings",
-            description = "List ratings the authenticated attendee has submitted, with the related "
-                    + "session title, stars, and comment. Use this when the user asks what they "
-                    + "have rated.")
+            description = "List the ratings the attendee has submitted, with session title, stars, "
+                    + "and comment. Use when the user asks what they have rated.")
     public List<RatingDto> myRatings() {
         return me.myRatings();
     }

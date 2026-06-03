@@ -20,7 +20,6 @@ import nl.lunatech.jprime.api.domain.Session;
 import nl.lunatech.jprime.api.dto.ApiError;
 import nl.lunatech.jprime.api.dto.CreateRatingRequest;
 import nl.lunatech.jprime.api.dto.RatingDto;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -28,7 +27,6 @@ import java.time.ZoneOffset;
 @Path("/api/v1/sessions/{id}/ratings")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed("attendee")
-@Tag(name = "ratings", description = "Attendee ratings for sessions")
 public class RatingResource {
 
     @Inject

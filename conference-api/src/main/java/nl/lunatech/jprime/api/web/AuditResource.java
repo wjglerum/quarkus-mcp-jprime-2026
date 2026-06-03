@@ -8,13 +8,11 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import nl.lunatech.jprime.api.domain.AuditEvent;
 import nl.lunatech.jprime.api.dto.AuditEventDto;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
 
 @Path("/api/v1/audit")
 @Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "audit", description = "Audit feed used by the talk's second-screen demo")
 public class AuditResource {
 
     @GET

@@ -26,51 +26,39 @@ public class PublicTools {
     Optional<String> demoNow;
 
     @Tool(name = "list_sessions",
-            description = "Search the jPrime 2026 conference schedule. Use this when the user asks "
-                    + "to find talks by topic, keyword, or by speaker name. Returns matching sessions "
-                    + "sorted by start time, each with its title, abstract, room, timing, and the "
-                    + "primary speaker. Pass `query` for free-text search across titles and abstracts, "
-                    + "or `speaker_name` to filter by a speaker (case-insensitive substring match). "
-                    + "Both arguments may be combined.")
+            description = "Search the jPrime 2026 conference schedule by topic, keyword, or speaker. "
+                    + "Returns matching sessions sorted by start time. Pass `query` for free-text search "
+                    + "over titles and abstracts, `speaker_name` to filter by speaker; both may combine.")
     public List<SessionDto> listSessions(
             @ToolArg(name = "query",
-                    description = "Optional case-insensitive substring matched against session "
-                            + "titles and abstracts.",
+                    description = "Case-insensitive substring matched against titles and abstracts.",
                     required = false) String query,
             @ToolArg(name = "speaker_name",
-                    description = "Optional speaker name (case-insensitive substring match).",
+                    description = "Speaker name (case-insensitive substring match).",
                     required = false) String speakerName) {
         return api.listSessions(null, speakerName, query);
     }
 
     @Tool(name = "get_session",
-            description = "Get full details for one session, including its abstract, room, timing, "
-                    + "cancellation state, and the primary speaker. Identify the talk with "
-                    + "session_query (a few words of the title) when you do not have the numeric id.")
+            description = "Get full details for one session: abstract, room, timing, cancellation "
+                    + "state, and speaker. Pass session_query (a few words of the title) when you do "
+                    + "not have the numeric id.")
     public SessionDto getSession(
-            @ToolArg(name = "session_id",
-                    description = "Numeric session id. Provide this if you already know it.",
-                    required = false) Long sessionId,
-            @ToolArg(name = "session_query",
-                    description = "A few distinctive words from the talk title, used when the "
-                            + "numeric id is unknown.",
-                    required = false) String sessionQuery) {
+            @ToolArg(name = "session_id", description = SessionResolver.SESSION_ID, required = false) Long sessionId,
+            @ToolArg(name = "session_query", description = SessionResolver.SESSION_QUERY, required = false) String sessionQuery) {
         return api.getSession(sessions.resolve(sessionId, sessionQuery));
     }
 
     @Tool(name = "whats_on_now",
-            description = "List the sessions that are happening right now at jPrime 2026. Use this "
-                    + "when the user asks `what is on now`, `what is happening`, or `what is in the "
-                    + "current slot`. The conference clock can be pinned via the `DEMO_NOW` "
-                    + "environment variable so rehearsals stay deterministic.")
+            description = "List the sessions happening right now at jPrime 2026. Use for `what is on "
+                    + "now`, `what is happening`, `current slot`.")
     public List<SessionDto> whatsOnNow() {
         return api.currentSessions(demoNow.orElse(null));
     }
 
     @Tool(name = "whats_next",
-            description = "List the next upcoming sessions starting after the current conference "
-                    + "clock. Use this when the user asks `what is next`, `what is coming up`, or "
-                    + "wants a short look-ahead. Returns three sessions by default; cap at 20.")
+            description = "List the next upcoming sessions after the current conference clock. Use "
+                    + "for `what is next` or `what is coming up`. Returns three by default; cap at 20.")
     public List<SessionDto> whatsNext(
             @ToolArg(name = "limit",
                     description = "Maximum number of upcoming sessions to return. Defaults to 3.",

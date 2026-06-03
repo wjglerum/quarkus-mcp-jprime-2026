@@ -7,7 +7,6 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import nl.lunatech.jprime.mcp.dto.SessionDto;
-import nl.lunatech.jprime.mcp.dto.SpeakerDto;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 import java.util.List;
@@ -35,8 +34,4 @@ public interface PublicConferenceApi {
     @GET
     @Path("/sessions/next")
     List<SessionDto> nextSessions(@QueryParam("at") String at, @QueryParam("limit") Integer limit);
-
-    @GET
-    @Path("/speakers")
-    List<SpeakerDto> listSpeakers();
 }

@@ -24,7 +24,6 @@ import nl.lunatech.jprime.api.dto.CreateBookmarkRequest;
 import nl.lunatech.jprime.api.dto.RatingDto;
 import nl.lunatech.jprime.api.dto.SessionDto;
 import nl.lunatech.jprime.api.dto.SessionFeedbackDto;
-import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -33,7 +32,6 @@ import java.util.List;
 @Path("/api/v1/me")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed("attendee")
-@Tag(name = "me", description = "Endpoints for the current authenticated attendee")
 public class MeResource {
 
     @Inject
