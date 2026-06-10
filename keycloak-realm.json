@@ -7,7 +7,7 @@
   "accessTokenLifespan": 600,
   "accessTokenLifespanForImplicitFlow": 900,
   "ssoSessionIdleTimeout": 1800,
-  "ssoSessionMaxLifespan": 600,
+  "ssoSessionMaxLifespan": 3600,
   "ssoSessionIdleTimeoutRememberMe": 0,
   "ssoSessionMaxLifespanRememberMe": 0,
   "offlineSessionIdleTimeout": 2592000,
@@ -312,7 +312,8 @@
         "email",
         "roles",
         "web-origins",
-        "acr"
+        "acr",
+        "attendee"
       ],
       "optionalClientScopes": [
         "offline_access",
@@ -347,7 +348,8 @@
       ],
       "optionalClientScopes": [
         "offline_access",
-        "microprofile-jwt"
+        "microprofile-jwt",
+        "attendee"
       ]
     }
   ],
@@ -1008,6 +1010,41 @@
           }
         }
       ]
+    },
+    {
+      "name": "attendee",
+      "description": "Grants the conference-mcp and conference-api audiences so the token can be used at the MCP endpoint and propagated to the API",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "conference-mcp audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "conference-mcp",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "conference-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "conference-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "defaultDefaultClientScopes": [
@@ -1020,7 +1057,8 @@
   ],
   "defaultOptionalClientScopes": [
     "offline_access",
-    "microprofile-jwt"
+    "microprofile-jwt",
+    "attendee"
   ],
   "browserSecurityHeaders": {
     "contentSecurityPolicyReportOnly": "",

@@ -12,9 +12,9 @@ The stage-side runbook for the three live demos at jPrime 2026.
 
 ## Pre-flight: step-up demo prerequisite
 
-`willem.jan` is **not** TOTP-enrolled in the seeded realm. The step-up demo surfaces as a 401 + `WWW-Authenticate: Bearer error="insufficient_user_authentication"` response from `conference-api` and a `ToolCallException("insufficient_user_authentication: ...")` from `conference-mcp`. Show that response on the second screen.
+The seeded realm ships a TOTP credential for `willem.jan` (secret `jprimemcp2026stepupseed`) and a `Browser Stepup` authentication flow that maps `urn:mace:incommon:iap:silver` to LoA 2 (OTP, re-prompted after 5 minutes). Add that secret to a TOTP app on your phone before the talk (manual entry, Base32, 6 digits, 30s) so you can complete the OTP prompt live.
 
-Do **not** attempt to complete TOTP on stage unless you have enrolled it manually via the Keycloak account console first. That enrollment is a manual pre-flight step the speaker performs ahead of the talk, not something the realm ships.
+The step-up demo first surfaces as a 401 + `WWW-Authenticate: Bearer error="insufficient_user_authentication"` response from `conference-api` and a `ToolCallException("insufficient_user_authentication: ...")` from `conference-mcp`. Show that response on the second screen, then re-authenticate through the OTP prompt and retry.
 
 ## Env vars
 
@@ -81,6 +81,8 @@ conference-mcp/src/main/resources/META-INF/resources/cimd/mcp-inspector.json
 ```
 
 served at `http://host.docker.internal:8081/cimd/mcp-inspector.json`. That same URL is the `client_id` value inside the document, so the two match exactly as the spec requires.
+
+One deliberate spec deviation to mention if asked: the CIMD draft requires the `client_id` URL to use the `https` scheme. Plain `http` works here only because the whole demo runs on Docker loopback; any real deployment must serve the metadata document over HTTPS.
 
 ### Why host.docker.internal
 
@@ -180,7 +182,7 @@ The audit dashboard shows nothing yet (read-only tools do not audit). Tell the a
 2. Ask: *"Show me the feedback on my MCP talk."* (calls `my_session_feedback`) returns seeded ratings.
 3. Ask: *"Who signed up to attend my Concurrency Crossroads deep dive?"* (calls `view_session_attendees`).
 4. Server returns `insufficient_user_authentication`. Show the 401 + `WWW-Authenticate` response on the second screen (the chat surfaces the same as an amber step-up card). Talk through what a real client would do next: re-auth with `acr_values=urn:mace:incommon:iap:silver`, retry the tool call.
-5. (Optional, only if TOTP was enrolled in pre-flight) Re-authenticate at the higher ACR and retry. The audit dashboard will show an amber `view_session_attendees` event with `token_acr=urn:mace:incommon:iap:silver`.
+5. Re-authenticate at the higher ACR (the OTP prompt uses the seeded TOTP secret from pre-flight) and retry. The audit dashboard will show an amber `view_session_attendees` event with `token_acr=urn:mace:incommon:iap:silver`.
 
 Talking points: **step-up is the spec-level answer to "OAuth is for humans". Same protocol, different acr requirement, server-driven.**
 
@@ -196,7 +198,8 @@ Talking points: **step-up is the spec-level answer to "OAuth is for humans". Sam
 | `whats_on_now` returns nothing | Confirm `DEMO_NOW` env var is set, then `q` and restart `conference-api`. |
 | Audit dashboard frozen | Hard refresh the browser tab; the poll is every 2 seconds. |
 | Audit log shows stale rehearsal data | `docker rm -f` the Dev Services Postgres container and restart `conference-api`. Hibernate `drop-and-create` plus the seeders give you a clean slate. |
-| Step-up flow does not prompt for TOTP | Expected: the realm does not ship a custom step-up flow. Show the 401 + `WWW-Authenticate` response and explain what a compliant client does next. |
+| Step-up flow does not prompt for TOTP | The running Keycloak predates the realm's `Browser Stepup` flow. Recycle Keycloak so the realm re-imports (see "Reload the realm"). As a fallback, show the 401 + `WWW-Authenticate` response and explain what a compliant client does next. |
+| `/mcp` returns `401` with a valid login | The token lacks `aud=conference-mcp`. The audience comes from the `attendee` client scope: `conference-chat` has it as a default scope, DCR/CIMD clients must request `scope=attendee` (it is a realm-level optional scope). |
 
 ### Reload the realm
 

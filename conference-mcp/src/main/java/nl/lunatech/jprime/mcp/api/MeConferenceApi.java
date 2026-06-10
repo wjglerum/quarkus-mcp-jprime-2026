@@ -77,8 +77,18 @@ public interface MeConferenceApi {
         if (status < 400) return null;
         String body = response.readEntity(String.class);
         return switch (status) {
-            case 401 -> new ToolCallException("insufficient_user_authentication: backend requires step-up. "
-                    + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver and retry.");
+            // Only a step-up challenge (RFC 9470) should trigger the re-authenticate-with-MFA hint;
+            // an expired or wrong-audience token is a plain authentication failure, not a step-up case.
+            case 401 -> {
+                String challenge = response.getHeaderString("WWW-Authenticate");
+                if (challenge != null && challenge.contains("insufficient_user_authentication")) {
+                    yield new ToolCallException("insufficient_user_authentication: backend requires step-up. "
+                            + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver and retry.");
+                }
+                yield new ToolCallException("authentication_failed: the backend rejected the token"
+                        + (challenge == null ? "" : " (" + challenge + ")")
+                        + ". Sign in again to get a fresh token.");
+            }
             case 422 -> new ToolCallException("rejected: "
                     + (body != null && body.contains("session_not_started") ? "session_not_started" : body));
             default -> new ToolCallException("backend_error: " + body);
