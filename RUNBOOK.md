@@ -53,6 +53,8 @@ Open `http://localhost:8080/audit-live/` on the second monitor.
 
 Point MCP Inspector at the streamable HTTP endpoint `http://localhost:8081/mcp` (not `/mcp/sse`; the SSE transport is deprecated in current Inspector builds). Use the **Guided** or **Quick OAuth Flow** in Inspector's Auth panel. The flow runs entirely off discovery: Inspector reads `/.well-known/oauth-protected-resource` from `conference-mcp`, finds the Keycloak realm, registers a fresh client via DCR, then runs PKCE and sends you to the Keycloak login.
 
+The whole `/mcp` endpoint requires the `attendee` scope, so the first unauthenticated request returns a `401` whose `WWW-Authenticate` header carries the `resource_metadata` pointer. That is the spec-compliant signal that starts the discovery above. A token that authenticates but lacks the `attendee` scope returns a `403` with `error="insufficient_scope", scope="attendee"`, emitted by the `quarkus-mcp-server-oidc` extension. Both challenges name the resource metadata URL so the client knows where to go next.
+
 The `jprime` realm is deliberately configured for **open anonymous DCR** so Inspector can register with no pre-shared credentials. Keycloak ships four anonymous client-registration policies that each block or cripple a DCR client; all four have been cleared in `keycloak-realm.json`:
 
 | Removed/changed policy | Why it had to go |
@@ -188,6 +190,7 @@ Talking points: **step-up is the spec-level answer to "OAuth is for humans". Sam
 |---------|-----|
 | Inspector: `-32099 ... Error POSTing to endpoint (HTTP 404)` | Stale MCP session after a `conference-mcp` reload. Disconnect then Connect in Inspector to get a fresh session. |
 | Inspector DCR fails (rejected policy, 403 on tools, or claimless token) | The running Keycloak is using a stale realm. Recycle it so the realm re-imports (see "Reload the realm" below). |
+| `/mcp` returns `403 insufficient_scope` | The token authenticates but its realm roles do not include `attendee`. Log in as `attendee`, `willem.jan`, or `admin-demo`; all three carry it. |
 | CIMD: Keycloak does not fetch the metadata document, or `invalid_client` | The `cimd` feature is not active on the running container, or the container predates the `features=cimd` setting. Recycle Keycloak (see "Reload the realm"), then check the startup log for `features enabled: cimd`. |
 | CIMD: Keycloak cannot reach the metadata URL | `host.docker.internal` is not resolvable. Add `127.0.0.1 host.docker.internal` to `/etc/hosts` and confirm `curl http://host.docker.internal:8081/cimd/mcp-inspector.json` returns the document. |
 | `whats_on_now` returns nothing | Confirm `DEMO_NOW` env var is set, then `q` and restart `conference-api`. |

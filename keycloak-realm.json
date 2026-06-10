@@ -143,6 +143,14 @@
   "webAuthnPolicyPasswordlessExtraOrigins": [],
   "users": [
     {
+      "username": "service-account-conference-chat",
+      "enabled": true,
+      "serviceAccountClientId": "conference-chat",
+      "realmRoles": [
+        "attendee"
+      ]
+    },
+    {
       "username": "attendee",
       "enabled": true,
       "emailVerified": true,
@@ -287,6 +295,7 @@
       "secret": "conference-chat-secret",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
       "redirectUris": [
         "http://localhost:8082/*",
         "http://localhost:*"

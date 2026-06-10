@@ -22,7 +22,7 @@ public class ConferenceApiHealthCheck implements HealthCheck {
             int sessions = api.listSessions(null, null, null).size();
             return HealthCheckResponse.named("conference-api")
                     .up()
-                    .withData("sessions", sessions)
+                    .withData("sessions", String.valueOf(sessions))
                     .build();
         } catch (Exception e) {
             return HealthCheckResponse.named("conference-api")

@@ -1,9 +1,12 @@
 package nl.lunatech.jprime.mcp;
 
-import io.quarkiverse.mcp.server.test.McpAssured;
 import io.quarkiverse.mcp.server.test.McpAssured.McpStreamableTestClient;
+import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.oidc.server.OidcWiremockTestResource;
 import org.junit.jupiter.api.Test;
+
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,13 +16,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * verifies the advertised tool catalogue: the public tools every client can see, plus
  * the role-gated attendee, speaker, and step-up tools. This is the contract the chat
  * client and any external MCP host depend on, so it is worth asserting explicitly.
+ *
+ * <p>The MCP endpoint is gated at the HTTP layer, so the client authenticates as a user with
+ * both the attendee and speaker roles to see the full catalogue.
  */
 @QuarkusTest
+@QuarkusTestResource(OidcWiremockTestResource.class)
 class McpToolsListTest {
 
     @Test
     void advertisesThePublicConferenceTools() {
-        McpStreamableTestClient client = McpAssured.newConnectedStreamableClient();
+        McpStreamableTestClient client = McpTestClients.connectAs("willem.jan", Set.of("attendee", "speaker"));
 
         client.when()
                 .toolsList(page -> {
@@ -38,7 +45,7 @@ class McpToolsListTest {
 
     @Test
     void advertisesTheRoleGatedTools() {
-        McpStreamableTestClient client = McpAssured.newConnectedStreamableClient();
+        McpStreamableTestClient client = McpTestClients.connectAs("willem.jan", Set.of("attendee", "speaker"));
 
         client.when()
                 .toolsList(page -> {

@@ -69,7 +69,7 @@ Playwright class re-enables OIDC and Keycloak through a `QuarkusTestProfile`.
 | `quarkus-oidc` | OIDC web-app flow with PKCE S256. |
 | `quarkus-qute` + `quarkus-rest-qute` | Server-rendered chat shell. |
 | `quarkus-langchain4j-mcp` | MCP client to `conference-mcp`. |
-| `quarkus-langchain4j-oidc-mcp-auth-provider` | Forwards the user's bearer token on MCP calls. |
+| `quarkus-oidc-client` | Service-account token for MCP calls outside a user request; the custom `McpAuthProvider` forwards the user's bearer token when one is in flight. |
 | `quarkus-langchain4j-anthropic` | Anthropic Claude provider. |
 | `quarkus-smallrye-health` | Liveness + readiness. |
 

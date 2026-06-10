@@ -72,6 +72,15 @@ sequenceDiagram
   Note over API,DB: audit_event attributed to preferred_username, not the AI
 ```
 
+## MCP endpoint authorization
+
+The whole `/mcp` endpoint is gated at the HTTP layer: every request must carry a valid Bearer token whose realm roles include `attendee`. `conference-mcp` runs `quarkus-oidc` in `service` mode (it validates the JWT against the Keycloak JWKS, no client id or secret needed) and adds the `quarkus-mcp-server-oidc` extension, which turns authorization failures into the challenges the MCP authorization spec expects:
+
+- **No token** returns `401` with a `WWW-Authenticate: Bearer ..., resource_metadata="..."` header. The `resource_metadata` URL is the RFC 9728 protected-resource document at `/.well-known/oauth-protected-resource`, and it is what drives an MCP client's discovery and OAuth flow.
+- **A valid token without the `attendee` scope** returns `403` with `WWW-Authenticate: Bearer error="insufficient_scope", scope="attendee", resource_metadata="..."`, telling the client exactly which scope to request.
+
+This is the endpoint-level gate. It is distinct from the step-up case in demo 3, where a missing MFA `acr` surfaces per tool as `insufficient_user_authentication`.
+
 ## Client registration: DCR vs CIMD
 
 An AI client has to obtain an OAuth client identity before it can run PKCE. The demo shows both mechanisms the MCP authorization spec allows, against the same realm.

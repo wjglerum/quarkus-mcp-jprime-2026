@@ -21,7 +21,7 @@ public class McpReadyCheck implements HealthCheck {
         try {
             ToolProviderResult tools = mcpToolProvider.provideTools(null);
             int count = tools == null ? 0 : tools.aiServiceTools().size();
-            b.withData("tool-count", count);
+            b.withData("tool-count", String.valueOf(count));
             return count > 0 ? b.up().build() : b.withData("reason", "no tools listed").down().build();
         } catch (Exception e) {
             return b.withData("error", e.getClass().getSimpleName())

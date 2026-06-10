@@ -1,10 +1,11 @@
 package nl.lunatech.jprime.mcp;
 
 import io.quarkiverse.mcp.server.ToolResponse;
-import io.quarkiverse.mcp.server.test.McpAssured;
 import io.quarkiverse.mcp.server.test.McpAssured.McpStreamableTestClient;
 import io.quarkus.test.InjectMock;
+import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.oidc.server.OidcWiremockTestResource;
 import nl.lunatech.jprime.mcp.api.PublicConferenceApi;
 import nl.lunatech.jprime.mcp.dto.SessionDto;
 import nl.lunatech.jprime.mcp.dto.SpeakerRef;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.when;
  * argument binding, the REST call the tool makes, and the serialized tool result.
  */
 @QuarkusTest
+@QuarkusTestResource(OidcWiremockTestResource.class)
 class PublicToolsMcpTest {
 
     @InjectMock
@@ -55,7 +58,7 @@ class PublicToolsMcpTest {
         when(api.listSessions(null, null, "MCP"))
                 .thenReturn(List.of(session(1L, "MCP Security in Practice")));
 
-        McpStreamableTestClient client = McpAssured.newConnectedStreamableClient();
+        McpStreamableTestClient client = McpTestClients.connectAs("attendee", Set.of("attendee"));
 
         client.when()
                 .toolsCall("list_sessions", Map.of("query", "MCP"), response -> {
@@ -77,7 +80,7 @@ class PublicToolsMcpTest {
         when(api.getSession(42L))
                 .thenReturn(session(42L, "MCP Security in Practice"));
 
-        McpStreamableTestClient client = McpAssured.newConnectedStreamableClient();
+        McpStreamableTestClient client = McpTestClients.connectAs("attendee", Set.of("attendee"));
 
         client.when()
                 .toolsCall("get_session", Map.of("session_query", "Security"), response -> {
@@ -96,7 +99,7 @@ class PublicToolsMcpTest {
         when(api.listSessions(null, null, "does-not-exist"))
                 .thenReturn(List.of());
 
-        McpStreamableTestClient client = McpAssured.newConnectedStreamableClient();
+        McpStreamableTestClient client = McpTestClients.connectAs("attendee", Set.of("attendee"));
 
         client.when()
                 .toolsCall("get_session", Map.of("session_query", "does-not-exist"), response -> {
@@ -113,7 +116,7 @@ class PublicToolsMcpTest {
         when(api.nextSessions(any(), anyInt()))
                 .thenReturn(List.of(session(2L, "Next Up: Loom"), session(3L, "Then: Valhalla")));
 
-        McpStreamableTestClient client = McpAssured.newConnectedStreamableClient();
+        McpStreamableTestClient client = McpTestClients.connectAs("attendee", Set.of("attendee"));
 
         client.when()
                 .toolsCall("whats_next", Map.of("limit", 2), response -> {
