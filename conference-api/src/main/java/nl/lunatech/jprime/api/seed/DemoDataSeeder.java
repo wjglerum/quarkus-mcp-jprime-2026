@@ -164,16 +164,23 @@ public class DemoDataSeeder {
                         .map(s -> s.id).orElse(talkSid);
 
         String strongAcr = "urn:mace:incommon:iap:silver";
+        // Representative issuer for the seeded backdrop; live events carry the real dev-services
+        // issuer (a random localhost port). The client column shows the AI client that acted:
+        // attendees browse through an MCP client (Claude, DCR-registered), the speaker acts
+        // through the enterprise chat app.
+        String iss = "https://auth.jprime.demo/realms/jprime";
+        String aiClient = "claude-desktop";
+        String chatClient = "conference-chat";
         Object[][] trail = {
-                {"attendee-alice", "BOOKMARK_ADD", "session:" + talkSid, "1", "pwd", "Practical MCP Security in Action"},
-                {"attendee-bob", "BOOKMARK_ADD", "session:" + talkSid, "1", "pwd", "Practical MCP Security in Action"},
-                {"attendee-carol", "RATE_SESSION", "session:" + talkSid, "1", "pwd", "stars=5 comment=great use of caffeine"},
-                {"attendee-dave", "RATE_SESSION_REJECTED_NOT_STARTED", "session:" + wjgSid, "1", "pwd", "stars=4"},
-                {"attendee-erin", "BOOKMARK_REMOVE", "session:" + talkSid, "1", "pwd", null},
-                {"willem.jan", "VIEW_SESSION_ATTENDEES", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", "viewed attendee list"},
-                {"willem.jan", "CANCEL_SESSION_ATTEMPTED", "session:" + wjgSid, "1", "pwd", "step-up required"},
-                {"willem.jan", "CANCEL_SESSION", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", "reason=room change"},
-                {"willem.jan", "CANCEL_SESSION_UNDONE", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", "reason=back on track"},
+                {"attendee-alice", "BOOKMARK_ADD", "session:" + talkSid, "1", "pwd", aiClient, "Practical MCP Security in Action"},
+                {"attendee-bob", "BOOKMARK_ADD", "session:" + talkSid, "1", "pwd", aiClient, "Practical MCP Security in Action"},
+                {"attendee-carol", "RATE_SESSION", "session:" + talkSid, "1", "pwd", aiClient, "stars=5 comment=great use of caffeine"},
+                {"attendee-dave", "RATE_SESSION_REJECTED_NOT_STARTED", "session:" + wjgSid, "1", "pwd", aiClient, "stars=4"},
+                {"attendee-erin", "BOOKMARK_REMOVE", "session:" + talkSid, "1", "pwd", aiClient, null},
+                {"willem.jan", "VIEW_SESSION_ATTENDEES", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", chatClient, "viewed attendee list"},
+                {"willem.jan", "CANCEL_SESSION_ATTEMPTED", "session:" + wjgSid, "1", "pwd", chatClient, "step-up required"},
+                {"willem.jan", "CANCEL_SESSION", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", chatClient, "reason=room change"},
+                {"willem.jan", "CANCEL_SESSION_UNDONE", "session:" + wjgSid, strongAcr, "pwd,mfa,otp", chatClient, "reason=back on track"},
         };
 
         OffsetDateTime base = OffsetDateTime.now(ZoneOffset.of("+03:00")).minusMinutes(12);
@@ -185,7 +192,9 @@ public class DemoDataSeeder {
             ev.target = (String) row[2];
             ev.tokenAcr = (String) row[3];
             ev.tokenAmr = (String) row[4];
-            ev.detail = (String) row[5];
+            ev.executedByClient = (String) row[5];
+            ev.tokenIss = iss;
+            ev.detail = (String) row[6];
             ev.createdAt = base.plusSeconds(n * 70L);
             ev.persist();
             n++;

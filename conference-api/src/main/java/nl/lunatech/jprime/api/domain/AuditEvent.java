@@ -26,6 +26,16 @@ public class AuditEvent extends PanacheEntity {
     @Column(name = "token_amr", columnDefinition = "TEXT")
     public String tokenAmr;
 
+    // The OAuth client that executed the action (azp claim), so the trail shows it was an AI
+    // client acting for the user, not the user clicking directly.
+    @Column(name = "executed_by_client")
+    public String executedByClient;
+
+    // The authorization server that minted the token (iss claim), proving where the identity
+    // and the authorizing claims came from.
+    @Column(name = "token_iss")
+    public String tokenIss;
+
     @Column(name = "created_at", nullable = false)
     public OffsetDateTime createdAt;
 

@@ -11,12 +11,14 @@ public record AuditEventDto(
         String target,
         String tokenAcr,
         String tokenAmr,
+        String executedByClient,
+        String tokenIss,
         OffsetDateTime createdAt,
         String detail
 ) {
     public static AuditEventDto of(AuditEvent e) {
         return new AuditEventDto(
                 e.id, e.attendeeSubject, e.action, e.target,
-                e.tokenAcr, e.tokenAmr, e.createdAt, e.detail);
+                e.tokenAcr, e.tokenAmr, e.executedByClient, e.tokenIss, e.createdAt, e.detail);
     }
 }

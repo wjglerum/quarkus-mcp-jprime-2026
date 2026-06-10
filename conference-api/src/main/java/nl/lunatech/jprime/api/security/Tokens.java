@@ -12,6 +12,18 @@ public final class Tokens {
         return acr == null ? null : String.valueOf(acr);
     }
 
+    /** The authorized party (azp): the OAuth client the token was issued to. */
+    public static String azp(JsonWebToken jwt) {
+        Object azp = jwt == null ? null : jwt.getClaim("azp");
+        return azp == null ? null : String.valueOf(azp);
+    }
+
+    /** The token issuer (iss): the authorization server that minted the token. */
+    public static String iss(JsonWebToken jwt) {
+        String iss = jwt == null ? null : jwt.getIssuer();
+        return iss == null || iss.isBlank() ? null : iss;
+    }
+
     /** The amr values comma-joined (no spaces), or null when absent. */
     public static String amr(JsonWebToken jwt) {
         Object amr = jwt == null ? null : jwt.getClaim("amr");
