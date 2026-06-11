@@ -65,7 +65,7 @@ Speaker role (`speaker`):
 - `GET /api/v1/me/sessions/feedback`
 
 Speaker role plus step-up
-(`acr=urn:mace:incommon:iap:silver` or `acr=2`, or `amr` containing `mfa`/`otp`):
+(`acr=urn:jprime:mfa` or `acr=2`):
 
 - `GET /api/v1/sessions/{id}/attendees`
 - `POST /api/v1/sessions/{id}/cancel` (reversible toggle)

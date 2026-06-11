@@ -206,8 +206,8 @@ All endpoints under `/api/v1/`. JSON in, JSON out. OpenAPI generated. Small surf
 ### Speaker (role `speaker`)
 - `GET /me/sessions/feedback` -- aggregate + individual ratings on my sessions.
 
-### Speaker, step-up required (acr=`urn:mace:incommon:iap:silver` or amr containing `mfa`/`otp`)
-- `GET /sessions/{id}/attendees` -- display names of attendees who bookmarked the session. Returns 401 with `WWW-Authenticate: Bearer error="insufficient_user_authentication", acr_values="urn:mace:incommon:iap:silver"` if step-up not satisfied. 403 if caller is not the speaker on the session (audited as `CANCEL_SESSION_ATTEMPTED`).
+### Speaker, step-up required (acr=`urn:jprime:mfa`)
+- `GET /sessions/{id}/attendees` -- display names of attendees who bookmarked the session. Returns 401 with `WWW-Authenticate: Bearer error="insufficient_user_authentication", acr_values="urn:jprime:mfa"` if step-up not satisfied. 403 if caller is not the speaker on the session (audited as `CANCEL_SESSION_ATTEMPTED`).
 - `POST /sessions/{id}/cancel` -- body `{ "reason": "..." }`. Reversible toggle. Audited as `CANCEL_SESSION` / `CANCEL_SESSION_UNDONE`.
 
 No admin reseed endpoint. Resetting demo state is a Dev Services container restart (see "Data ingestion").
@@ -262,7 +262,7 @@ Authorization uses **standard Jakarta annotations** wherever possible:
 
 These are processed by `quarkus-security` via CDI interceptors. A missing role surfaces as a `ForbiddenException` which the MCP server maps to a structured error.
 
-**Step-up** is the only check that needs custom code, because no standard annotation models the `acr` / `amr` claims, and the MCP wire wants the failure as a `ToolCallException("insufficient_user_authentication: ...")` so the client recognises it. Implement it as a single tiny helper:
+**Step-up** is the only check that needs custom code, because no standard annotation models the `acr` claim on MCP tools, and the MCP wire wants the failure as a `ToolCallException("insufficient_user_authentication: ...")` so the client recognises it. Implement it as a single tiny helper:
 
 ```java
 @ApplicationScoped
@@ -272,17 +272,10 @@ public class StepUp {
     public void require() {
         Object acr = jwt.getClaim("acr");
         if ("2".equals(String.valueOf(acr))
-                || "urn:mace:incommon:iap:silver".equals(String.valueOf(acr))) return;
-        Object amr = jwt.getClaim("amr");
-        if (amr instanceof Iterable<?> it) {
-            for (Object o : it) {
-                String s = String.valueOf(o);
-                if ("mfa".equals(s) || "otp".equals(s)) return;
-            }
-        }
+                || "urn:jprime:mfa".equals(String.valueOf(acr))) return;
         throw new ToolCallException(
                 "insufficient_user_authentication: this tool requires step-up MFA. "
-                        + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver and retry.");
+                        + "Re-authenticate with acr_values=urn:jprime:mfa and retry.");
     }
 }
 ```
@@ -426,9 +419,9 @@ A LangChain4j `AiService` with the MCP tool provider attached. System prompt is 
 - **Realm roles vs client scopes**: `attendee` and `speaker` are realm **roles**, not client scopes. The realm ships no custom `attendee` / `speaker` client scopes; the roles ride into the access token via the realm-default `roles` scope and surface at the JWT path `realm_access/roles`. None of the three apps may set `quarkus.oidc.authentication.scopes=attendee,speaker` (or any other non-existent scope) -- Keycloak rejects the auth request with `Invalid scopes`. The only OIDC scope-related config that should appear is `quarkus.oidc.roles.role-claim-path=realm_access/roles` on each app. The realm's `realm roles` mapper writes `realm_access.roles` into the **access token only** (not the ID token). conference-api and conference-mcp run in `service` mode, so they read roles from the access token by default. conference-chat runs in `web-app` mode, where roles default to the ID token, so it must also set `quarkus.oidc.roles.source=accesstoken`; otherwise `SecurityIdentity.getRoles()` is empty and the identity panel shows no roles. Read roles from `SecurityIdentity.getRoles()`, not `JsonWebToken.getGroups()` (the latter reads the token `groups` claim, which the realm does not populate).
 - Users (seeded in the realm export):
   - `attendee` / `attendee` -- role `attendee`.
-  - `willem.jan` / `willem.jan` -- roles `attendee` + `speaker`, linked to the Willem Jan speaker fixture. **Not TOTP-enrolled in the seeded realm.**
-  - `admin-demo` / `admin` -- roles `attendee` + `speaker`, full demo operator account.
-- Authentication flow: the realm uses Keycloak's default `browser` flow. There is no custom `browser-step-up` flow shipped with the realm. The step-up demo surfaces as a 401 + `WWW-Authenticate: Bearer error=insufficient_user_authentication, acr_values=urn:mace:incommon:iap:silver` from `conference-api` and a `ToolCallException("insufficient_user_authentication: ...")` from `conference-mcp`. The realm ships only the `acr.loa.map` entry (`urn:mace:incommon:iap:silver` -> level 2); wiring an actual ACR-gated OTP execution **and** enrolling TOTP on `willem.jan` is a manual pre-flight step the speaker performs via the Keycloak account console before the talk, not something the realm ships.
+  - `willem.jan` / `willem.jan` -- roles `attendee` + `speaker`, linked to the Willem Jan speaker fixture. TOTP-enrolled in the seeded realm (secret `jprimemcp2026stepupseed`).
+  - `admin-demo` / `admin` -- roles `attendee` + `speaker`, full demo operator account. TOTP-enrolled with the same seeded secret.
+- Authentication flow: the realm ships a custom `Browser Stepup` browser flow with two conditional Level-of-Assurance subflows (password at LoA 1, OTP at LoA 2, `loa-max-age` 300s on LoA 2) and the `acr.loa.map` entry `urn:jprime:mfa` -> level 2. The step-up demo surfaces as a 401 + `WWW-Authenticate: Bearer error=insufficient_user_authentication, acr_values=urn:jprime:mfa` from `conference-api` and a `ToolCallException("insufficient_user_authentication: ...")` from `conference-mcp`.
 - Token exchange is **not** enabled. No client uses service-account or direct-access grants.
 - Realm `frontendUrl` is **not** hardcoded. Dev Services maps Keycloak to a dynamic port; if `frontendUrl` is hardcoded, OIDC discovery breaks.
 
@@ -442,7 +435,7 @@ The realm was derived from Dev Services' default `quarkus` realm so it ships the
 
 - Leave `defaultClientScopes` empty on each app client so the realm-level defaults apply; overriding with a short list strips `basic` and kills the `sub` claim.
 - Do not hardcode `frontendUrl`; Dev Services maps Keycloak to a random host port.
-- `acr.loa.map` keys are ACR strings, values are integer-as-string levels (`"urn:mace:incommon:iap:silver": "2"`).
+- `acr.loa.map` keys are ACR strings, values are integer-as-string levels (`"urn:jprime:mfa": "2"`).
 
 ### Quarkus security config
 
@@ -466,9 +459,9 @@ The realm was derived from Dev Services' default `quarkus` realm so it ships the
 
 ### Required ACR check
 
-Step-up tools look for `acr=urn:mace:incommon:iap:silver` or `acr=2` or `amr` containing `mfa` / `otp`. On insufficiency:
+Step-up tools look for `acr=urn:jprime:mfa` or `acr=2`. On insufficiency:
 
-- conference-api returns 401 with `WWW-Authenticate: Bearer error="insufficient_user_authentication", acr_values="urn:mace:incommon:iap:silver"`.
+- conference-api returns 401 with `WWW-Authenticate: Bearer error="insufficient_user_authentication", acr_values="urn:jprime:mfa"`.
 - conference-mcp surfaces a `ToolCallException` whose message starts with `insufficient_user_authentication:` so the chat client can recognise it and offer the re-auth path.
 - conference-chat shows an amber step-up card with instructions to re-login at a higher ACR.
 
@@ -518,7 +511,7 @@ Punchline: not "AI rated it 5 stars" but "Willem Jan rated it 5 stars, executed 
 1. Stay as `willem.jan`, no MFA yet (`acr=1`).
 2. Click "Show feedback on my sessions". Works.
 3. Click "Who signed up for my Concurrency Crossroads deep dive?". The MCP tool returns `insufficient_user_authentication`. The chat UI shows an amber step-up card with the next step.
-4. Log out and back in, this time satisfying TOTP. `acr=urn:mace:incommon:iap:silver`. Retry the prompt. The attendee list comes back.
+4. Log out and back in, this time satisfying TOTP. `acr=urn:jprime:mfa`. Retry the prompt. The attendee list comes back.
 5. Click "Cancel my deep dive, reason is I want to go home early". The chat UI shows a red destructive card. The audit log shows `CANCEL_SESSION` with the strong acr.
 6. Click the prompt again to reverse the cancellation, showing the toggle behavior and that the action is reversible. Audit log shows `CANCEL_SESSION_UNDONE`.
 

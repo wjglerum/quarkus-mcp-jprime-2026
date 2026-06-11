@@ -14,20 +14,12 @@ public class StepUp {
     public void require() {
         Object acr = jwt.getClaim("acr");
         String acrStr = String.valueOf(acr);
-        if ("urn:mace:incommon:iap:silver".equals(acrStr) || "2".equals(acrStr)) {
+        // "2" covers a realm without the acr.loa.map alias
+        if ("urn:jprime:mfa".equals(acrStr) || "2".equals(acrStr)) {
             return;
-        }
-        Object amr = jwt.getClaim("amr");
-        if (amr instanceof Iterable<?> values) {
-            for (Object value : values) {
-                String s = String.valueOf(value);
-                if ("mfa".equals(s) || "otp".equals(s)) {
-                    return;
-                }
-            }
         }
         throw new ToolCallException(
                 "insufficient_user_authentication: this tool requires step-up MFA. "
-                        + "Re-authenticate with acr_values=urn:mace:incommon:iap:silver and retry.");
+                        + "Re-authenticate with acr_values=urn:jprime:mfa and retry.");
     }
 }

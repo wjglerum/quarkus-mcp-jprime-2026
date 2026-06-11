@@ -11,7 +11,7 @@ import nl.lunatech.jprime.chat.security.CurrentUser;
 /**
  * Returns the caller's current identity as JSON. The chat fetches this after a step-up popup
  * completes to refresh the acr/amr shown in the sidebar, confirming the session was upgraded
- * to silver without reloading the page (which would lose the transcript).
+ * to the MFA acr without reloading the page (which would lose the transcript).
  */
 @Path("/api/me")
 @Produces(MediaType.APPLICATION_JSON)

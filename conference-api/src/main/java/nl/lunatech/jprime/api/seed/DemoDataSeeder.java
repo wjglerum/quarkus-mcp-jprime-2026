@@ -163,7 +163,7 @@ public class DemoDataSeeder {
                 : Session.<Session>find("speaker.id", willemJan.id).<Session>firstResultOptional()
                         .map(s -> s.id).orElse(talkSid);
 
-        String strongAcr = "urn:mace:incommon:iap:silver";
+        String strongAcr = "urn:jprime:mfa";
         // Representative issuer for the seeded backdrop; live events carry the real dev-services
         // issuer (a random localhost port). The client column shows the AI client that acted:
         // attendees browse through an MCP client (Claude, DCR-registered), the speaker acts

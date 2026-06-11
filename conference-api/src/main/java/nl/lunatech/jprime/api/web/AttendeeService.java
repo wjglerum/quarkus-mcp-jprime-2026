@@ -61,10 +61,6 @@ public class AttendeeService {
         return identity.getRoles().contains("speaker");
     }
 
-    public boolean hasStrongAcr() {
-        return Tokens.hasStrongAcr(jwt);
-    }
-
     private Attendee refreshFromToken(Attendee a) {
         boolean dirty = false;
         if (a.displayName == null) {

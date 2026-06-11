@@ -22,7 +22,7 @@
     // --- MFA step-up -------------------------------------------------------
     // The chat is a single-page app, so we never navigate it. Instead we open the OIDC
     // step-up in a popup; once Keycloak completes the OTP, the callback rewrites the
-    // same-origin session cookie to acr=silver. The popup posts back, we refresh the shown
+    // same-origin session cookie to acr=urn:jprime:mfa. The popup posts back, we refresh the shown
     // identity and resend the prompt that needed MFA, all with the transcript intact.
     let stepUp = null; // { win, btn, prompt, poll }
 
@@ -79,8 +79,8 @@
             const hint = box.querySelector('.stepup-status') || document.createElement('p');
             hint.className = 'stepup-status';
             hint.textContent = prompt
-                ? 'MFA complete (acr=silver). Resending the prompt…'
-                : 'MFA complete (acr=silver).';
+                ? 'MFA complete (acr=urn:jprime:mfa). Resending the prompt…'
+                : 'MFA complete (acr=urn:jprime:mfa).';
             if (!hint.isConnected) box.appendChild(hint);
         }
         if (prompt) sendPrompt(prompt);

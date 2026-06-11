@@ -212,6 +212,12 @@
           "type": "password",
           "value": "admin",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "jPrime demo authenticator",
+          "secretData": "{\"value\":\"jprimemcp2026stepupseed\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
         }
       ]
     }
@@ -252,26 +258,13 @@
     },
     {
       "clientId": "conference-mcp",
-      "name": "Conference MCP Server",
+      "name": "Conference MCP Server (resource server)",
       "enabled": true,
+      "bearerOnly": true,
       "protocol": "openid-connect",
       "publicClient": false,
-      "secret": "conference-mcp-secret",
-      "standardFlowEnabled": true,
-      "redirectUris": [
-        "http://localhost:8080/*",
-        "http://localhost:8081/*",
-        "http://localhost:8082/*",
-        "http://localhost:6274/*"
-      ],
-      "webOrigins": [
-        "http://localhost:8080",
-        "http://localhost:8081",
-        "http://localhost:8082",
-        "http://localhost:6274"
-      ],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "use.refresh.tokens": "false"
       },
       "defaultClientScopes": [
         "basic",
@@ -2043,7 +2036,7 @@
     "parRequestUriLifespan": "60",
     "cibaInterval": "5",
     "realmReusableOtpCode": "false",
-    "acr.loa.map": "{\"urn:mace:incommon:iap:silver\": \"2\"}"
+    "acr.loa.map": "{\"urn:jprime:mfa\": \"2\"}"
   },
   "keycloakVersion": "26.5.7",
   "userManagedAccessAllowed": false,

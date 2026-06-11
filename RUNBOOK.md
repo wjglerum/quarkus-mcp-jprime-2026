@@ -12,7 +12,7 @@ The stage-side runbook for the three live demos at jPrime 2026.
 
 ## Pre-flight: step-up demo prerequisite
 
-The seeded realm ships a TOTP credential for `willem.jan` (secret `jprimemcp2026stepupseed`) and a `Browser Stepup` authentication flow that maps `urn:mace:incommon:iap:silver` to LoA 2 (OTP, re-prompted after 5 minutes). Add that secret to a TOTP app on your phone before the talk (manual entry, Base32, 6 digits, 30s) so you can complete the OTP prompt live.
+The seeded realm ships a TOTP credential for `willem.jan` (secret `jprimemcp2026stepupseed`) and a `Browser Stepup` authentication flow that maps `urn:jprime:mfa` to LoA 2 (OTP, re-prompted after 5 minutes). Add that secret to a TOTP app on your phone before the talk (manual entry, Base32, 6 digits, 30s) so you can complete the OTP prompt live.
 
 The step-up demo first surfaces as a 401 + `WWW-Authenticate: Bearer error="insufficient_user_authentication"` response from `conference-api` and a `ToolCallException("insufficient_user_authentication: ...")` from `conference-mcp`. Show that response on the second screen, then re-authenticate through the OTP prompt and retry.
 
@@ -181,8 +181,8 @@ The audit dashboard shows nothing yet (read-only tools do not audit). Tell the a
 1. Stay logged in as **willem.jan**, no MFA (acr=1).
 2. Ask: *"Show me the feedback on my MCP talk."* (calls `my_session_feedback`) returns seeded ratings.
 3. Ask: *"Who signed up to attend my Concurrency Crossroads deep dive?"* (calls `view_session_attendees`).
-4. Server returns `insufficient_user_authentication`. Show the 401 + `WWW-Authenticate` response on the second screen (the chat surfaces the same as an amber step-up card). Talk through what a real client would do next: re-auth with `acr_values=urn:mace:incommon:iap:silver`, retry the tool call.
-5. Re-authenticate at the higher ACR (the OTP prompt uses the seeded TOTP secret from pre-flight) and retry. The audit dashboard will show an amber `view_session_attendees` event with `token_acr=urn:mace:incommon:iap:silver`.
+4. Server returns `insufficient_user_authentication`. Show the 401 + `WWW-Authenticate` response on the second screen (the chat surfaces the same as an amber step-up card). Talk through what a real client would do next: re-auth with `acr_values=urn:jprime:mfa`, retry the tool call.
+5. Re-authenticate at the higher ACR (the OTP prompt uses the seeded TOTP secret from pre-flight) and retry. The audit dashboard will show an amber `view_session_attendees` event with `token_acr=urn:jprime:mfa`.
 
 Talking points: **step-up is the spec-level answer to "OAuth is for humans". Same protocol, different acr requirement, server-driven.**
 

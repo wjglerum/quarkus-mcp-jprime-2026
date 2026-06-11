@@ -33,7 +33,7 @@ public class StepUpTools {
                     + "sessions. Exposes personal data, so it requires recent MFA-backed step-up. If "
                     + "the token does not satisfy the acr requirement, returns "
                     + "`insufficient_user_authentication`; the client must re-authenticate with "
-                    + "`acr_values=urn:mace:incommon:iap:silver` and retry. Tell the user to sign in "
+                    + "`acr_values=urn:jprime:mfa` and retry. Tell the user to sign in "
                     + "again with a one-time code.")
     public List<AttendeeBookmarkDto> viewSessionAttendees(
             @ToolArg(name = "session_id", description = SessionResolver.SESSION_ID, required = false) Long sessionId,

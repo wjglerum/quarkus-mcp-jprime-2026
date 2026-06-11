@@ -17,13 +17,13 @@ import jakarta.enterprise.context.ApplicationScoped;
 @Redirect(Redirect.Location.OIDC_AUTHORIZATION)
 public class StepUpRedirectFilter implements OidcRedirectFilter {
 
-    static final String SILVER = "urn:mace:incommon:iap:silver";
+    static final String MFA_ACR = "urn:jprime:mfa";
 
     @Override
     public void filter(OidcRedirectFilter.OidcRedirectContext context) {
         String path = context.routingContext().request().path();
         if (path != null && path.startsWith("/step-up")) {
-            context.additionalQueryParams().add("acr_values", SILVER);
+            context.additionalQueryParams().add("acr_values", MFA_ACR);
         }
     }
 }

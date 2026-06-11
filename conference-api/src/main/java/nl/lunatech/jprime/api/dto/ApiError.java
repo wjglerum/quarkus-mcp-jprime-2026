@@ -10,8 +10,4 @@ public record ApiError(String error, String description, @JsonProperty("required
     public static ApiError of(String error, String description) {
         return new ApiError(error, description, null);
     }
-
-    public static ApiError stepUp(String description, String requiredAcr) {
-        return new ApiError("insufficient_user_authentication", description, requiredAcr);
-    }
 }

@@ -82,12 +82,9 @@ public class ToolDispatcher {
         }
     }
 
+    // Match only the RFC 9470 error code; looser markers can appear in legitimate tool results.
     private static boolean isStepUp(String message) {
-        if (message == null) return false;
-        String lower = message.toLowerCase();
-        return lower.contains("insufficient_user_authentication")
-                || lower.contains("step-up")
-                || lower.contains("acr_values");
+        return message != null && message.toLowerCase().contains("insufficient_user_authentication");
     }
 
     public record ToolResult(String tool, Map<String, Object> args, Object result,

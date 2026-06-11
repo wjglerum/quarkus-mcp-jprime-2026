@@ -2,7 +2,7 @@ package nl.lunatech.jprime.api.security;
 
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
-/** Reads the acr/amr step-up signals off an access token, the same way the MCP server does. */
+/** Reads step-up and provenance claims off an access token; amr is recorded for audit only. */
 public final class Tokens {
 
     private Tokens() {}
@@ -36,18 +36,5 @@ public final class Tokens {
             return sb.length() == 0 ? null : sb.toString();
         }
         return amr == null ? null : String.valueOf(amr);
-    }
-
-    public static boolean hasStrongAcr(JsonWebToken jwt) {
-        String acr = acr(jwt);
-        if ("2".equals(acr) || "urn:mace:incommon:iap:silver".equals(acr)) {
-            return true;
-        }
-        String amr = amr(jwt);
-        if (amr == null) return false;
-        for (String value : amr.split(",")) {
-            if ("mfa".equals(value) || "otp".equals(value)) return true;
-        }
-        return false;
     }
 }

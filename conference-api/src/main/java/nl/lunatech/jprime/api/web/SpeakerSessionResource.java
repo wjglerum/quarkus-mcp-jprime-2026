@@ -1,5 +1,6 @@
 package nl.lunatech.jprime.api.web;
 
+import io.quarkus.oidc.AuthenticationContext;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -25,6 +26,8 @@ import java.util.List;
 @Path("/api/v1/sessions/{id}")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed("speaker")
+// Quarkus turns an insufficient acr into the RFC 9470 challenge (401 + WWW-Authenticate)
+@AuthenticationContext("urn:jprime:mfa")
 public class SpeakerSessionResource {
 
     @Inject
@@ -37,9 +40,6 @@ public class SpeakerSessionResource {
     @Path("/attendees")
     @Transactional
     public List<AttendeeBookmarkDto> attendees(@PathParam("id") Long id) {
-        if (!attendees.hasStrongAcr()) {
-            throw new StepUpRequiredException("attendee list requires MFA-backed authentication");
-        }
         Session session = requireOwnedSession(id);
         List<AttendeeBookmarkDto> list = Bookmark.<Bookmark>list("session.id = ?1 order by createdAt asc", session.id)
                 .stream()
@@ -53,9 +53,6 @@ public class SpeakerSessionResource {
     @Path("/cancel")
     @Transactional
     public SessionDto cancel(@PathParam("id") Long id, CancelSessionRequest req) {
-        if (!attendees.hasStrongAcr()) {
-            throw new StepUpRequiredException("cancelling a session requires MFA-backed authentication");
-        }
         if (req == null || req.reason() == null || req.reason().isBlank()) {
             throw new WebApplicationException("reason is required", 400);
         }
