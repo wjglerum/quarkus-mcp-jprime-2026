@@ -15,7 +15,7 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.36.1</quarkus.platform.version>
         <quarkus-langchain4j.version>1.10.0</quarkus-langchain4j.version>
-        <quarkus-playwright.version>2.3.4</quarkus-playwright.version>
+        <quarkus-playwright.version>2.3.5</quarkus-playwright.version>
         <assertj.version>3.27.7</assertj.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
